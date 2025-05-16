@@ -1,0 +1,193 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { useData } from "@/contexts/data-context"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/components/ui/use-toast"
+import { Loader2 } from "lucide-react"
+
+interface Ganho {
+  id: string
+  name: string
+  description: string
+  value: number
+  wage: boolean
+  creationDate: string
+}
+
+interface GanhoDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  ganho: Ganho | null
+}
+
+export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
+  const { addGanho, updateGanho } = useData()
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(false)
+
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [value, setValue] = useState("")
+  const [date, setDate] = useState<Date | undefined>(new Date())
+  const [wage, setWage] = useState(false)
+
+  // Resetar o formulário quando o diálogo é aberto
+  useEffect(() => {
+    if (open) {
+      if (ganho) {
+        setName(ganho.name)
+        setDescription(ganho.description)
+        setValue(ganho.value.toString())
+        setDate(new Date(ganho.creationDate))
+        setWage(ganho.wage)
+      } else {
+        setName("")
+        setDescription("")
+        setValue("")
+        setDate(new Date())
+        setWage(false)
+      }
+    }
+  }, [open, ganho])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!name || !value || !date) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Preencha todos os campos obrigatórios.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const ganhoData = {
+        name,
+        description,
+        value: Number.parseFloat(value),
+        wage,
+      }
+
+      if (ganho) {
+        await updateGanho(ganho.id, ganhoData)
+        toast({
+          title: "Ganho atualizado",
+          description: "O ganho foi atualizado com sucesso.",
+        })
+      } else {
+        await addGanho(ganhoData)
+        toast({
+          title: "Ganho adicionado",
+          description: "O ganho foi adicionado com sucesso.",
+        })
+      }
+
+      onOpenChange(false)
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: ganho ? "Não foi possível atualizar o ganho." : "Não foi possível adicionar o ganho.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>{ganho ? "Editar Ganho" : "Novo Ganho"}</DialogTitle>
+          <DialogDescription>
+            {ganho
+              ? "Edite as informações do ganho selecionado."
+              : "Preencha as informações para adicionar um novo ganho."}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Nome</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex: Salário, Freelance, etc."
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Descrição</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descrição do ganho"
+                className="resize-none"
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="value">Valor (R$)</Label>
+              <Input
+                id="value"
+                type="number"
+                step="0.01"
+                min="0"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="0,00"
+                required
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="wage" checked={wage} onCheckedChange={setWage} />
+              <Label htmlFor="wage">Ganho recorrente</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {ganho ? "Atualizando..." : "Adicionando..."}
+                </>
+              ) : ganho ? (
+                "Atualizar"
+              ) : (
+                "Adicionar"
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
