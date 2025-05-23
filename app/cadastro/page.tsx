@@ -37,7 +37,7 @@ const ClientOnly = ({ children }: { children: React.ReactNode }) => {
 // Create a client-only auth form component
 const RegisterForm = () => {
   // Now we can safely use hooks here
-  const { register } = useAuth()
+  const { registerService } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -64,7 +64,7 @@ const RegisterForm = () => {
     setLoading(true)
 
     try {
-      await register(name, email, password)
+      await registerService(name, email, password)
       toast({
         title: "Cadastro realizado com sucesso!",
         description: "Você já pode fazer login com suas credenciais.",

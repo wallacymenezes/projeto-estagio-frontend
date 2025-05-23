@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useData } from "@/contexts/data-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,53 +17,38 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
-
-interface Despesa {
-  id: string
-  name: string
-  description: string
-  value: number
-  creationDate: string
-  category: string
-}
-
-interface Categoria {
-  id: string
-  name: string
-  description: string | null
-  color: string
-}
+import type { Expense } from "@/models/Expense"
+import type { Category } from "@/models/Category"
 
 interface DespesaDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  despesa: Despesa | null
-  categorias: Categoria[]
+  despesa: Expense | null
+  categorias: Category[]
 }
 
 export function DespesaDialog({ open, onOpenChange, despesa, categorias }: DespesaDialogProps) {
-  const { addDespesa, updateDespesa } = useData()
+  const { addExpense, updateExpense } = useData()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [value, setValue] = useState("")
-  const [category, setCategory] = useState<string>("")
+  const [category, setCategory] = useState<Category | null>(null)
 
-  // Resetar o formulário quando o diálogo é aberto
   useEffect(() => {
     if (open) {
       if (despesa) {
         setName(despesa.name)
-        setDescription(despesa.description)
+        setDescription(despesa.description ?? "")
         setValue(despesa.value.toString())
-        setCategory(despesa.category || "")
+        setCategory(despesa.category)
       } else {
         setName("")
         setDescription("")
         setValue("")
-        setCategory("")
+        setCategory(null)
       }
     }
   }, [open, despesa])
@@ -73,10 +56,19 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!name || !value) {
+    if (!name || !value || isNaN(Number(value)) || Number(value) <= 0) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha todos os campos obrigatórios.",
+        description: "Preencha todos os campos obrigatórios com valores válidos.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!category) {
+      toast({
+        title: "Categoria obrigatória",
+        description: "Por favor, selecione uma categoria.",
         variant: "destructive",
       })
       return
@@ -85,21 +77,22 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
     setLoading(true)
 
     try {
-      const despesaData = {
+      const despesaData: Omit<Expense, "id" | "creationDate"> = {
         name,
         description,
         value: Number.parseFloat(value),
-        category: category || null,
+        category,
+        userId: despesa?.userId, // opcionalmente mantenha userId se existir
       }
 
       if (despesa) {
-        await updateDespesa(despesa.id, despesaData)
+        await updateExpense(despesa.id, despesaData)
         toast({
           title: "Despesa atualizada",
           description: "A despesa foi atualizada com sucesso.",
         })
       } else {
-        await addDespesa(despesaData)
+        await addExpense(despesaData)
         toast({
           title: "Despesa adicionada",
           description: "A despesa foi adicionada com sucesso.",
@@ -107,10 +100,12 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
       }
 
       onOpenChange(false)
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
-        description: despesa ? "Não foi possível atualizar a despesa." : "Não foi possível adicionar a despesa.",
+        description: despesa
+          ? "Não foi possível atualizar a despesa."
+          : "Não foi possível adicionar a despesa.",
         variant: "destructive",
       })
     } finally {
@@ -167,14 +162,24 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
             </div>
             <div className="grid gap-2">
               <Label htmlFor="category">Categoria</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select
+                value={category?.id.toString() ?? "none"}
+                onValueChange={(val) => {
+                  if (val === "none") {
+                    setCategory(null)
+                  } else {
+                    const cat = categorias.find(c => c.id === parseInt(val))
+                    setCategory(cat ?? null)
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sem categoria</SelectItem>
                   {categorias.map((categoria) => (
-                    <SelectItem key={categoria.id} value={categoria.id}>
+                    <SelectItem key={categoria.id} value={categoria.id.toString()}>
                       {categoria.name}
                     </SelectItem>
                   ))}

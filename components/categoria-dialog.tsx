@@ -54,7 +54,7 @@ const CORES_PREDEFINIDAS = [
 ]
 
 export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDialogProps) {
-  const { addCategoria, updateCategoria } = useData()
+  const { addCategory, updateCategory } = useData()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
@@ -99,13 +99,13 @@ export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDial
       }
 
       if (categoria) {
-        await updateCategoria(categoria.id, categoriaData)
+        updateCategory(categoria.id, categoriaData)
         toast({
           title: "Categoria atualizada",
           description: "A categoria foi atualizada com sucesso.",
         })
       } else {
-        await addCategoria(categoriaData)
+        addCategory(categoriaData)
         toast({
           title: "Categoria adicionada",
           description: "A categoria foi adicionada com sucesso.",

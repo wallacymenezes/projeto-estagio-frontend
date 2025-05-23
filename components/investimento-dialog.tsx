@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useData } from "@/contexts/data-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,28 +17,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
+import type { Investment } from "@/models/Investment"
 
-interface Investimento {
-  id: string
-  name: string
-  description: string
-  percentage: number
-  months: number
-  creationDate: string
-  value: number
-  investmentType: string
-}
+const INVESTMENT_TYPES = ["TESOURO", "FIIS", "ACOES", "POUPANCA", "CDI", "CRYPTO"] as const
 
 interface InvestimentoDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  investimento: Investimento | null
+  investimento: Investment | null
 }
 
-const INVESTMENT_TYPES = ["Tesouro Direto", "CDB", "LCI", "LCA", "Fundos Imobiliários", "Ações", "Poupança", "Outros"]
-
 export function InvestimentoDialog({ open, onOpenChange, investimento }: InvestimentoDialogProps) {
-  const { addInvestimento, updateInvestimento } = useData()
+  const { addInvestment, updateInvestment } = useData()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
@@ -49,14 +37,13 @@ export function InvestimentoDialog({ open, onOpenChange, investimento }: Investi
   const [value, setValue] = useState("")
   const [percentage, setPercentage] = useState("")
   const [months, setMonths] = useState("")
-  const [investmentType, setInvestmentType] = useState("")
+  const [investmentType, setInvestmentType] = useState<typeof INVESTMENT_TYPES[number] | "">("")
 
-  // Resetar o formulário quando o diálogo é aberto
   useEffect(() => {
     if (open) {
       if (investimento) {
         setName(investimento.name)
-        setDescription(investimento.description)
+        setDescription(investimento.description ?? "")
         setValue(investimento.value.toString())
         setPercentage(investimento.percentage.toString())
         setMonths(investimento.months.toString())
@@ -87,23 +74,26 @@ export function InvestimentoDialog({ open, onOpenChange, investimento }: Investi
     setLoading(true)
 
     try {
-      const investimentoData = {
+      const now = new Date().toISOString()
+
+      const investimentoData: Omit<Investment, "id"> = {
         name,
-        description,
-        value: Number.parseFloat(value),
-        percentage: Number.parseFloat(percentage),
-        months: Number.parseInt(months),
+        description: description || undefined,
+        value: Number(value),
+        percentage: Number(percentage),
+        months: Number(months),
         investmentType,
+        creation_date: investimento ? investimento.creation_date : now, // manter creation_date no update, usar data atual no create
       }
 
       if (investimento) {
-        await updateInvestimento(investimento.id, investimentoData)
+        await updateInvestment(investimento.id, investimentoData)
         toast({
           title: "Investimento atualizado",
           description: "O investimento foi atualizado com sucesso.",
         })
       } else {
-        await addInvestimento(investimentoData)
+        await addInvestment(investimentoData)
         toast({
           title: "Investimento adicionado",
           description: "O investimento foi adicionado com sucesso.",
@@ -198,7 +188,14 @@ export function InvestimentoDialog({ open, onOpenChange, investimento }: Investi
             </div>
             <div className="grid gap-2">
               <Label htmlFor="investmentType">Tipo de Investimento</Label>
-              <Select value={investmentType} onValueChange={setInvestmentType}>
+              <Select
+                value={investmentType}
+                onValueChange={(val) => {
+                  if (INVESTMENT_TYPES.includes(val as any)) {
+                    setInvestmentType(val as typeof INVESTMENT_TYPES[number])
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>

@@ -2,18 +2,15 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, ChangeEvent } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/components/ui/use-toast"
 import { motion } from "framer-motion"
 import { Eye, EyeOff, LogIn } from "lucide-react"
-// Import the GoogleLoginButton component
-import { GoogleLoginButton } from "@/components/google-login-button"
 
 // Create a client-only wrapper component
 const ClientOnly = ({ children }: { children: React.ReactNode }) => {
@@ -39,31 +36,31 @@ const ClientOnly = ({ children }: { children: React.ReactNode }) => {
 // Create a client-only auth form component
 const LoginForm = () => {
   // Now we can safely use hooks here
-  const { login } = useAuth()
+  const { handleLogin } = useAuth()
   const router = useRouter()
-  const { toast } = useToast()
+  //const { toast } = useToast()
 
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [loginRequest, setLoginRequest] = useState({
+    user: "",
+    password: "",
+  });
+
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
+  // Em seu LoginForm
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    handleLogin(loginRequest)
+    router.push("/dashboard")
+  }
 
-    try {
-      await login(email, password)
-      router.push("/dashboard")
-    } catch (error) {
-      toast({
-        title: "Erro ao fazer login",
-        description: "Verifique suas credenciais e tente novamente.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
+  function atualizarEstado(e: ChangeEvent<HTMLInputElement>) {
+    setLoginRequest({
+      ...loginRequest,
+      [e.target.name]: e.target.value,
+    });
   }
 
   return (
@@ -87,10 +84,11 @@ const LoginForm = () => {
                 <Label htmlFor="email">E-mail</Label>
                 <Input
                   id="email"
+                  name="user"
                   type="email"
                   placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={loginRequest.user}
+                  onChange={atualizarEstado}
                   required
                   className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
                 />
@@ -105,10 +103,11 @@ const LoginForm = () => {
                 <div className="relative">
                   <Input
                     id="password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={loginRequest.password}
+                    onChange={atualizarEstado}
                     required
                     className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-blue-500"
                   />
@@ -139,21 +138,6 @@ const LoginForm = () => {
                 )}
               </Button>
             </form>
-
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Ou continue com</span>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <GoogleLoginButton />
-              </div>
-            </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <div className="text-center text-sm">

@@ -52,18 +52,11 @@ export function Header() {
       <div className="flex flex-1 items-center justify-between">
         <h1 className="text-xl font-semibold md:text-2xl">{getPageTitle()}</h1>
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-              3
-            </span>
-          </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={user?.avatarUrl || ""} alt={user?.name || ""} />
+                  <AvatarImage src={user?.photo || ""} alt={user?.name || ""} />
                   <AvatarFallback>
                     <User className="h-5 w-5" />
                   </AvatarFallback>

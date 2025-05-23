@@ -16,11 +16,6 @@ export const metadata = {
     generator: 'v0.dev'
 }
 
-// Add a script component for Google Sign-In
-function GoogleSignInScript() {
-  return <script src="https://accounts.google.com/gsi/client" async defer />
-}
-
 export default function RootLayout({
   children,
 }: {
@@ -28,9 +23,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <head>
-        <GoogleSignInScript />
-      </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <AuthProvider>

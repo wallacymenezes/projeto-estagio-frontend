@@ -1,180 +1,189 @@
-"use client"
+"use client";
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { api } from "@/lib/api"
-import { useRouter } from "next/navigation"
-import { jwtDecode } from "jwt-decode"
-
-interface User {
-  id: string
-  name: string
-  email: string
-  avatarUrl: string | null
-}
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react";
+import { useRouter } from "next/navigation";
+import { User } from "@/models/User";
+import { LoginRequest } from "@/models/Login";
+import { login, register } from "@/Service/Service";
+import { toast } from "@/hooks/use-toast";
+import { set } from "date-fns";
 
 interface AuthContextType {
-  user: User | null
-  loading: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string) => Promise<void>
-  logout: () => void
-  updateProfile: (data: { name: string; avatarFile: File | null }) => Promise<void>
-  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>
+  user: User | null;
+  loading: boolean;
+  handleLogin(loginRequest: LoginRequest): Promise<void>;
+  registerService: (
+    name: string,
+    email: string,
+    password: string
+  ) => Promise<void>;
+  logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
-
-  // Prevent hydration errors
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-
-    // Only run auth check on client side
-    const token = localStorage.getItem("token")
-
-    if (token) {
-      api.defaults.headers.common.Authorization = `Bearer ${token}`
-
-      // Decodificando o token para obter o userId
+  const [user, setUser] = useState<User | null>(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
       try {
-        const decodedToken: any = jwtDecode(token)
-        const userId = decodedToken.sub // O "sub" é geralmente o "userId" no JWT
-
-        // Faz a requisição para buscar os dados do usuário com base no ID
-        api
-          .get(`/users/${userId}`)
-          .then((response) => {
-            setUser(response.data)
-          })
-          .catch(() => {
-            localStorage.removeItem("token")
-            delete api.defaults.headers.common.Authorization
-          })
-          .finally(() => {
-            setLoading(false)
-          })
-      } catch (error) {
-        console.error("Error decoding token:", error)
-        localStorage.removeItem("token")
-        delete api.defaults.headers.common.Authorization
-        setLoading(false)
+        return JSON.parse(storedUser) as User;
+      } catch {
+        return getEmptyUser();
       }
     } else {
-      setLoading(false)
+      return getEmptyUser();
     }
-  }, [])
+  });
 
-  const login = async (email: string, password: string) => {
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  //const [isLoading, setIsLoading] = useState(false);
+  const authenticated = !!user?.token;
+
+  async function handleLogin(loginRequest: LoginRequest) {
+    setLoading(true);
     try {
-      // Realiza a requisição de login com o email e senha
-      const response = await api.post("/auth/login", { user: email, password })
+      // Agora response é do tipo User
+      const userDTO: User = await login("/auth/login", loginRequest);
 
-      const { accessToken, expiresIn } = response.data
-
-      // Armazenar o token no localStorage
-      localStorage.setItem("token", accessToken)
-
-      // Configurar o token no cabeçalho Authorization para todas as requisições seguintes
-      api.defaults.headers.common.Authorization = `Bearer ${accessToken}`
-
-      // Decodificar o token para obter o userId (caso necessário)
-      const decodedToken: any = jwtDecode(accessToken)
-  
-      const userId = decodedToken.sub
-
-      return
-    } catch (error) {
-      console.error("Login error:", error)
-      throw error
-    }
-  }
-
-  const register = async (name: string, email: string, password: string) => {
-    try {
-      await api.post("/auth/register", { name, email, password })
-      return
-    } catch (error) {
-      console.error("Register error:", error)
-      throw error
-    }
-  }
-
-  const logout = () => {
-    localStorage.removeItem("token")
-    delete api.defaults.headers.common.Authorization
-    setUser(null)
-    router.push("/login")
-  }
-
-  const updateProfile = async (data: { name: string; avatarFile: File | null }) => {
-    try {
-      const formData = new FormData()
-      formData.append("name", data.name)
-
-      if (data.avatarFile) {
-        formData.append("photo", data.avatarFile)
+      if (!userDTO) {
+        throw new Error("Resposta do servidor nula.");
       }
 
-      const response = await api.put("/users/profile", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      })
+      if (!userDTO.token) {
+        throw new Error("Token não encontrado na resposta.");
+      }
 
-      setUser((prev) => {
-        if (!prev) return null
+      // Remove o prefixo "Bearer " do token, se existir
+      const token = userDTO.token.startsWith("Bearer ")
+        ? userDTO.token.substring(7)
+        : userDTO.token;
 
-        return {
-          ...prev,
-          name: data.name,
-          avatarUrl: response.data.photo || prev.avatarUrl,
-        }
-      })
+      const userData: User = {
+        ...userDTO,
+        token: token,
+      };
 
-      return
-    } catch (error) {
-      console.error("Update profile error:", error)
-      throw error
+      setUser(userData);
+      localStorage.setItem("user", JSON.stringify(userData));
+      toast({
+        title: "Login realizado com sucesso!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao fazer login",
+        description:
+          error.message || "Verifique suas credenciais e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   }
 
-  const updatePassword = async (currentPassword: string, newPassword: string) => {
+  const registerService = async (
+    name: string,
+    email: string,
+    password: string
+  ) => {
     try {
-      await api.put("/users/password", { currentPassword, newPassword })
-      return
-    } catch (error) {
-      console.error("Update password error:", error)
-      throw error
+      const userToRegister = {
+        name,
+        email,
+        password,
+        photo: "",
+        registrationMethod: "OWN",
+      };
+
+      // Aguarda a resposta da API
+      const response = await register<User>("/users/register", userToRegister);
+
+      if (response && response.token) {
+        // Remove "Bearer " do token, se existir
+        const token = response.token.startsWith("Bearer ")
+          ? response.token.substring(7)
+          : response.token;
+
+        const userData: User = {
+          ...response,
+          token,
+        };
+
+        setUser(userData);
+        localStorage.setItem("user", JSON.stringify(userData));
+        toast({
+          title: "Cadastro realizado com sucesso!",
+        });
+        router.push("/dashboard");
+      } else {
+        toast({
+          title: "Cadastro realizado!",
+          description: "Faça login para acessar sua conta.",
+        });
+        router.push("/login");
+      }
+    } catch (error: any) {
+      console.error("Register error:", error);
+      toast({
+        title: "Erro ao cadastrar",
+        description: error.message || "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+      throw error;
     }
+  };
+
+  const logout = () => {
+    localStorage.removeItem("user");
+    setUser(null);
+    router.push("/login");
+  };
+
+  function getEmptyUser(): User {
+    return {
+      userId: "",
+      name: "",
+      email: "",
+      password: undefined,
+      photo: undefined,
+      registrationMethod: undefined,
+      token: "",
+      earnings: [],
+      expenses: [],
+      investments: [],
+      objectives: [],
+    };
   }
 
   // Provide a default value during server-side rendering
   const contextValue: AuthContextType = {
     user,
     loading,
-    login,
-    register,
+    handleLogin,
+    registerService,
     logout,
-    updateProfile,
-    updatePassword,
-  }
+  };
 
   // Only render children when mounted on client side
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
 
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error("useAuth must be used within an AuthProvider");
   }
 
-  return context
+  return context;
 }

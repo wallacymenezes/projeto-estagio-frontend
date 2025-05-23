@@ -1,263 +1,214 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useData } from "@/contexts/data-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DateRangePicker } from "@/components/date-range-picker"
-import { DataTable } from "@/components/data-table"
-import { DespesaDialog } from "@/components/despesa-dialog"
-import { formatCurrency } from "@/lib/utils"
-import type { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { toast } from "@/components/ui/use-toast"
-import { PieChart } from "@/components/charts"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/components/ui/use-toast"
+import { Loader2 } from "lucide-react"
+import type { Expense } from "@/models/Expense"
+import type { Category } from "@/models/Category"
 
-interface Despesa {
-  id: string
-  descricao: string
-  valor: number
-  data: string
-  categoria: {
-    id: string
-    nome: string
-  } | null
+interface DespesaDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  despesa: Expense | null
+  categorias: Category[]
 }
 
-export default function DespesasPage() {
-  const { despesas, categorias, fetchDespesas, fetchCategorias, deleteDespesa } = useData()
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedDespesa, setSelectedDespesa] = useState<Despesa | null>(null)
-  const [filteredDespesas, setFilteredDespesas] = useState<Despesa[]>([])
-  const [dateRange, setDateRange] = useState<{
-    from: Date
-    to: Date
-  }>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(),
-  })
+export function DespesaDialog({ open, onOpenChange, despesa, categorias }: DespesaDialogProps) {
+  const { addExpense, updateExpense } = useData()
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(false)
+
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [value, setValue] = useState("")
+  const [category, setCategory] = useState<Category | null>(null)
 
   useEffect(() => {
-    fetchDespesas()
-    fetchCategorias()
-  }, [fetchDespesas, fetchCategorias])
+    if (open) {
+      if (despesa) {
+        setName(despesa.name)
+        setDescription(despesa.description ?? "")
+        setValue(despesa.value.toString())
+        setCategory(despesa.category)
+      } else {
+        setName("")
+        setDescription("")
+        setValue("")
+        setCategory(null)
+      }
+    }
+  }, [open, despesa])
 
-  useEffect(() => {
-    setFilteredDespesas(
-      despesas.filter((despesa) => {
-        const date = new Date(despesa.data)
-        return date >= dateRange.from && date <= dateRange.to
-      }),
-    )
-  }, [despesas, dateRange])
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
 
-  const handleEdit = (despesa: Despesa) => {
-    setSelectedDespesa(despesa)
-    setIsDialogOpen(true)
-  }
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteDespesa(id)
+    if (!name || !value || isNaN(Number(value)) || Number(value) <= 0) {
       toast({
-        title: "Despesa excluída",
-        description: "A despesa foi excluída com sucesso.",
-      })
-    } catch (error) {
-      toast({
-        title: "Erro ao excluir",
-        description: "Não foi possível excluir a despesa.",
+        title: "Campos obrigatórios",
+        description: "Preencha todos os campos obrigatórios com valores válidos.",
         variant: "destructive",
       })
+      return
+    }
+
+    if (!category) {
+      toast({
+        title: "Categoria obrigatória",
+        description: "Por favor, selecione uma categoria.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      // Passar o objeto category completo na despesa
+      const despesaData: Omit<Expense, "id" | "creationDate"> = {
+        name,
+        description,
+        value: Number.parseFloat(value),
+        category,
+        userId: despesa?.userId, // opcionalmente manter userId se disponível
+      }
+
+      if (despesa) {
+        await updateExpense(despesa.id, despesaData)
+        toast({
+          title: "Despesa atualizada",
+          description: "A despesa foi atualizada com sucesso.",
+        })
+      } else {
+        await addExpense(despesaData)
+        toast({
+          title: "Despesa adicionada",
+          description: "A despesa foi adicionada com sucesso.",
+        })
+      }
+
+      onOpenChange(false)
+    } catch {
+      toast({
+        title: "Erro",
+        description: despesa ? "Não foi possível atualizar a despesa." : "Não foi possível adicionar a despesa.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const columns: ColumnDef<Despesa>[] = [
-    {
-      accessorKey: "descricao",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Descrição
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-    },
-    {
-      accessorKey: "categoria.nome",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Categoria
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => row.original.categoria?.nome || "Sem categoria",
-    },
-    {
-      accessorKey: "valor",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Valor
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => formatCurrency(row.getValue("valor")),
-    },
-    {
-      accessorKey: "data",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Data
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => new Date(row.getValue("data")).toLocaleDateString("pt-BR"),
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => {
-        const despesa = row.original
-
-        return (
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => handleEdit(despesa)}>
-              <Edit className="h-4 w-4" />
-              <span className="sr-only">Editar</span>
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Trash className="h-4 w-4" />
-                  <span className="sr-only">Excluir</span>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDelete(despesa.id)} className="bg-red-600 hover:bg-red-700">
-                    Excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        )
-      },
-    },
-  ]
-
-  const totalDespesas = filteredDespesas.reduce((acc, despesa) => acc + despesa.valor, 0)
-
-  // Preparar dados para o gráfico
-  const despesasPorCategoria = filteredDespesas.reduce(
-    (acc, despesa) => {
-      const categoria = despesa.categoria?.nome || "Sem categoria"
-      if (!acc[categoria]) {
-        acc[categoria] = 0
-      }
-      acc[categoria] += despesa.valor
-      return acc
-    },
-    {} as Record<string, number>,
-  )
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Despesas</h1>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-          <Button
-            onClick={() => {
-              setSelectedDespesa(null)
-              setIsDialogOpen(true)
-            }}
-            className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Despesa
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumo</CardTitle>
-            <CardDescription>Visão geral das suas despesas no período selecionado</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Total de Despesas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    {formatCurrency(totalDespesas)}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Quantidade de Registros</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{filteredDespesas.length}</div>
-                </CardContent>
-              </Card>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>{despesa ? "Editar Despesa" : "Nova Despesa"}</DialogTitle>
+          <DialogDescription>
+            {despesa
+              ? "Edite as informações da despesa selecionada."
+              : "Preencha as informações para adicionar uma nova despesa."}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Nome</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex: Aluguel, Mercado, etc."
+                required
+              />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Despesas por Categoria</CardTitle>
-            <CardDescription>Distribuição das suas despesas por categoria</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            <PieChart data={Object.entries(despesasPorCategoria).map(([name, value]) => ({ name, value }))} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Todas as Despesas</CardTitle>
-          <CardDescription>Gerencie todas as suas despesas</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={columns}
-            data={filteredDespesas}
-            searchColumn="descricao"
-            searchPlaceholder="Filtrar por descrição..."
-          />
-        </CardContent>
-      </Card>
-
-      <DespesaDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        despesa={selectedDespesa}
-        categorias={categorias}
-      />
-    </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Descrição</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descrição da despesa"
+                className="resize-none"
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="value">Valor (R$)</Label>
+              <Input
+                id="value"
+                type="number"
+                step="0.01"
+                min="0"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="0,00"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="category">Categoria</Label>
+              <Select
+                value={category?.id.toString() ?? "none"}
+                onValueChange={(val) => {
+                  if (val === "none") {
+                    setCategory(null)
+                  } else {
+                    const cat = categorias.find(c => c.id === parseInt(val))
+                    setCategory(cat ?? null)
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem categoria</SelectItem>
+                  {categorias.map((categoria) => (
+                    <SelectItem key={categoria.id} value={categoria.id.toString()}>
+                      {categoria.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {despesa ? "Atualizando..." : "Adicionando..."}
+                </>
+              ) : despesa ? (
+                "Atualizar"
+              ) : (
+                "Adicionar"
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

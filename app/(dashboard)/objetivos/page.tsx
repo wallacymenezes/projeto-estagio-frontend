@@ -1,14 +1,20 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useData } from "@/contexts/data-context"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DataTable } from "@/components/data-table"
-import { ObjetivoDialog } from "@/components/objetivo-dialog"
-import { formatCurrency } from "@/lib/utils"
-import type { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react"
+import { useState, useEffect, useMemo } from "react";
+import { useData } from "@/contexts/data-context";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { DataTable } from "@/components/data-table";
+import { ObjetivoDialog } from "@/components/objetivo-dialog";
+import { formatCurrency } from "@/lib/utils";
+import type { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,87 +25,104 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { toast } from "@/components/ui/use-toast"
-import { Progress } from "@/components/ui/progress"
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/components/ui/use-toast";
+import { Progress } from "@/components/ui/progress";
 
-interface Objetivo {
-  id: string
-  nome: string
-  descricao: string
-  valorAlvo: number
-  valorAtual: number
-  dataLimite: string | null
-  status: "em_andamento" | "concluido" | "cancelado"
-}
+import type { Objective } from "@/models/Objective";
+import type { Investment } from "@/models/Investment";
 
 export default function ObjetivosPage() {
-  const { objetivos, fetchObjetivos, deleteObjetivo } = useData()
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedObjetivo, setSelectedObjetivo] = useState<Objetivo | null>(null)
+  const {
+    Objectives,
+    Investments,
+    fetchObjectives,
+    fetchInvestments,
+    deleteObjective,
+  } = useData();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedObjective, setSelectedObjective] = useState<Objective | null>(
+    null
+  );
 
   useEffect(() => {
-    fetchObjetivos()
-  }, [fetchObjetivos])
+    fetchObjectives();
+    fetchInvestments();
+  }, [fetchObjectives, fetchInvestments]);
 
-  const handleEdit = (objetivo: Objetivo) => {
-    setSelectedObjetivo(objetivo)
-    setIsDialogOpen(true)
-  }
+  const handleEdit = (objective: Objective) => {
+    setSelectedObjective(objective);
+    setIsDialogOpen(true);
+  };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     try {
-      await deleteObjetivo(id)
+      await deleteObjective(id);
       toast({
         title: "Objetivo excluído",
         description: "O objetivo foi excluído com sucesso.",
-      })
-    } catch (error) {
+      });
+    } catch {
       toast({
         title: "Erro ao excluir",
         description: "Não foi possível excluir o objetivo.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
-  const columns: ColumnDef<Objetivo>[] = [
+  // Calcular valorAtual para cada objetivo somando investimentos relacionados
+  const objetivosComValorAtual = useMemo(() => {
+    return Objectives.map((obj) => {
+      const valorAtual = Investments.filter(
+        (inv) => inv.objectiveId?.id === obj.id
+      ).reduce((acc, inv) => acc + inv.value, 0);
+
+      return {
+        ...obj,
+        valorAtual,
+      };
+    });
+  }, [Objectives, Investments]);
+
+  const columns: ColumnDef<Objective & { valorAtual: number }>[] = [
     {
-      accessorKey: "nome",
+      accessorKey: "name",
       header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
           Nome
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
     },
     {
-      accessorKey: "valorAlvo",
+      accessorKey: "targetValue",
       header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
           Valor Alvo
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => formatCurrency(row.getValue("valorAlvo")),
+      cell: ({ row }) => formatCurrency(row.getValue("targetValue")),
     },
     {
-      accessorKey: "valorAtual",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Valor Atual
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => formatCurrency(row.getValue("valorAtual")),
+      id: "valorAtual",
+      header: "Valor Atual",
+      cell: ({ row }) => formatCurrency(row.original.valorAtual),
     },
     {
       id: "progresso",
       header: "Progresso",
       cell: ({ row }) => {
-        const valorAtual = row.original.valorAtual
-        const valorAlvo = row.original.valorAlvo
-        const progresso = (valorAtual / valorAlvo) * 100
+        const valorAtual = row.original.valorAtual;
+        const valorAlvo = row.original.targetValue;
+        const progresso = valorAlvo > 0 ? (valorAtual / valorAlvo) * 100 : 0;
 
         return (
           <div className="w-full">
@@ -111,55 +134,37 @@ export default function ObjetivosPage() {
             </div>
             <Progress value={progresso} className="h-2" />
           </div>
-        )
+        );
       },
     },
     {
-      accessorKey: "dataLimite",
+      accessorKey: "term",
       header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Data Limite
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Prazo
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => {
-        const dataLimite = row.getValue("dataLimite") as string | null
-        return dataLimite ? new Date(dataLimite).toLocaleDateString("pt-BR") : "Sem data"
-      },
-    },
-    {
-      accessorKey: "status",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Status
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => {
-        const status = row.getValue("status") as string
-        return (
-          <div
-            className={`px-2 py-1 rounded-full text-xs font-medium inline-block ${
-              status === "em_andamento"
-                ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-                : status === "concluido"
-                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                  : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-            }`}
-          >
-            {status === "em_andamento" ? "Em andamento" : status === "concluido" ? "Concluído" : "Cancelado"}
-          </div>
-        )
+        const term = row.getValue("term") as string;
+        return term ? new Date(term).toLocaleDateString("pt-BR") : "Sem prazo";
       },
     },
     {
       id: "actions",
       cell: ({ row }) => {
-        const objetivo = row.original
+        const objective = row.original;
 
         return (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => handleEdit(objetivo)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEdit(objective)}
+            >
               <Edit className="h-4 w-4" />
               <span className="sr-only">Editar</span>
             </Button>
@@ -174,29 +179,38 @@ export default function ObjetivosPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Tem certeza que deseja excluir este objetivo? Esta ação não pode ser desfeita.
+                    Tem certeza que deseja excluir este objetivo? Esta ação não
+                    pode ser desfeita.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDelete(objetivo.id)} className="bg-red-600 hover:bg-red-700">
+                  <AlertDialogAction
+                    onClick={() => handleDelete(objective.id)}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
                     Excluir
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           </div>
-        )
+        );
       },
     },
-  ]
+  ];
 
-  const totalObjetivos = objetivos.length
-  const objetivosConcluidos = objetivos.filter((obj) => obj.status === "concluido").length
-  const objetivosEmAndamento = objetivos.filter((obj) => obj.status === "em_andamento").length
-  const valorTotalAlvo = objetivos.reduce((acc, obj) => acc + obj.valorAlvo, 0)
-  const valorTotalAtual = objetivos.reduce((acc, obj) => acc + obj.valorAtual, 0)
-  const progressoGeral = (valorTotalAtual / valorTotalAlvo) * 100 || 0
+  const totalObjectives = objetivosComValorAtual.length;
+  const valorTotalAlvo = objetivosComValorAtual.reduce(
+    (acc, obj) => acc + obj.targetValue,
+    0
+  );
+  const valorTotalAtual = objetivosComValorAtual.reduce(
+    (acc, obj) => acc + obj.valorAtual,
+    0
+  );
+  const progressoGeral =
+    valorTotalAlvo > 0 ? (valorTotalAtual / valorTotalAlvo) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -204,8 +218,8 @@ export default function ObjetivosPage() {
         <h1 className="text-3xl font-bold tracking-tight">Objetivos</h1>
         <Button
           onClick={() => {
-            setSelectedObjetivo(null)
-            setIsDialogOpen(true)
+            setSelectedObjective(null);
+            setIsDialogOpen(true);
           }}
           className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600"
         >
@@ -214,41 +228,31 @@ export default function ObjetivosPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total de Objetivos</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total de Objetivos
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalObjetivos}</div>
+            <div className="text-2xl font-bold">{totalObjectives}</div>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Objetivos Concluídos</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Progresso Geral
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{objetivosConcluidos}</div>
-            <Progress value={(objetivosConcluidos / totalObjetivos) * 100 || 0} className="h-2 mt-2" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Objetivos em Andamento</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{objetivosEmAndamento}</div>
-            <Progress value={(objetivosEmAndamento / totalObjetivos) * 100 || 0} className="h-2 mt-2" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Progresso Geral</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{progressoGeral.toFixed(0)}%</div>
+            <div className="text-2xl font-bold">
+              {progressoGeral.toFixed(0)}%
+            </div>
             <div className="text-xs text-muted-foreground mb-1">
-              {formatCurrency(valorTotalAtual)} de {formatCurrency(valorTotalAlvo)}
+              {formatCurrency(valorTotalAtual)} de{" "}
+              {formatCurrency(valorTotalAlvo)}
             </div>
             <Progress value={progressoGeral} className="h-2" />
           </CardContent>
@@ -258,14 +262,25 @@ export default function ObjetivosPage() {
       <Card>
         <CardHeader>
           <CardTitle>Todos os Objetivos</CardTitle>
-          <CardDescription>Gerencie todos os seus objetivos financeiros</CardDescription>
+          <CardDescription>
+            Gerencie todos os seus objetivos financeiros
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={objetivos} searchColumn="nome" searchPlaceholder="Filtrar por nome..." />
+          <DataTable
+            columns={columns}
+            data={objetivosComValorAtual}
+            searchColumn="name"
+            searchPlaceholder="Filtrar por nome..."
+          />
         </CardContent>
       </Card>
 
-      <ObjetivoDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} objetivo={selectedObjetivo} />
+      <ObjetivoDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        objetivo={selectedObjective}
+      />
     </div>
-  )
+  );
 }

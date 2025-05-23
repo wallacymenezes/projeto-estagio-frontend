@@ -11,150 +11,120 @@ import { motion } from "framer-motion"
 import { ArrowDownIcon, ArrowUpIcon, BanknoteIcon, CoinsIcon, LineChartIcon, TargetIcon } from "lucide-react"
 
 export default function DashboardPage() {
-  const { ganhos, despesas, investimentos, objetivos, fetchGanhos, fetchDespesas, fetchInvestimentos, fetchObjetivos } =
-    useData()
+  const { Earnings, Expenses, Investments, Objectives, fetchEarnings, fetchExpenses, fetchInvestments, fetchObjectives } = useData()
 
-  const [dateRange, setDateRange] = useState<{
-    from: Date
-    to: Date
-  }>({
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   })
 
   const [comparisons, setComparisons] = useState({
-    ganhos: 0,
-    despesas: 0,
-    investimentos: 0,
-    objetivos: 0,
+    earnings: 0,
+    expenses: 0,
+    investments: 0,
+    objectives: 0,
   })
+
+  // Função intermediária para garantir que from e to não são undefined
+  function handleDateChange(range: { from?: Date; to?: Date }) {
+    if (range.from && range.to) {
+      setDateRange({ from: range.from, to: range.to })
+    }
+  }
 
   useEffect(() => {
-    fetchGanhos()
-    fetchDespesas()
-    fetchInvestimentos()
-    fetchObjetivos()
-  }, [fetchGanhos, fetchDespesas, fetchInvestimentos, fetchObjetivos])
+    fetchEarnings()
+    fetchExpenses()
+    fetchInvestments()
+    fetchObjectives()
+  }, [fetchEarnings, fetchExpenses, fetchInvestments, fetchObjectives])
 
   // Filtrar dados pelo intervalo de datas
-  const filteredGanhos = ganhos.filter((ganho) => {
-    const date = new Date(ganho.creationDate)
+  const filteredEarnings = Earnings.filter((earning) => {
+    const date = new Date(earning.creationDate)
     return date >= dateRange.from && date <= dateRange.to
   })
 
-  const filteredDespesas = despesas.filter((despesa) => {
-    const date = new Date(despesa.creationDate)
+  const filteredExpenses = Expenses.filter((expense) => {
+    const date = new Date(expense.creationDate)
     return date >= dateRange.from && date <= dateRange.to
   })
 
-  const filteredInvestimentos = investimentos.filter((investimento) => {
-    const date = new Date(investimento.creationDate)
+  const filteredInvestments = Investments.filter((investment) => {
+    const date = new Date(investment.creation_date ?? investment.creation_date)
     return date >= dateRange.from && date <= dateRange.to
   })
 
   // Calcular totais
-  const totalGanhos = filteredGanhos.reduce((acc, ganho) => acc + ganho.value, 0)
-  const totalDespesas = filteredDespesas.reduce((acc, despesa) => acc + despesa.value, 0)
-  const totalInvestimentos = filteredInvestimentos.reduce((acc, inv) => acc + inv.value, 0)
-  const totalObjetivos = objetivos.reduce((acc, obj) => acc + obj.target, 0)
+  const totalEarnings = filteredEarnings.reduce((acc, earning) => acc + earning.value, 0)
+  const totalExpenses = filteredExpenses.reduce((acc, expense) => acc + expense.value, 0)
+  const totalInvestments = filteredInvestments.reduce((acc, investment) => acc + investment.value, 0)
+  const totalObjectives = Objectives.reduce((acc, obj) => acc + (obj.targetValue ?? 0), 0)
 
-  // Calcular comparações com período anterior
+  // Comparações com período anterior
   useEffect(() => {
-    // Calcular o período anterior com a mesma duração
     const duration = dateRange.to.getTime() - dateRange.from.getTime()
     const prevPeriodEnd = new Date(dateRange.from)
     const prevPeriodStart = new Date(prevPeriodEnd.getTime() - duration)
 
-    // Filtrar dados do período anterior
-    const prevGanhos = ganhos.filter((ganho) => {
-      const date = new Date(ganho.creationDate)
+    const prevEarnings = Earnings.filter((earning) => {
+      const date = new Date(earning.creationDate)
+      return date >= prevPeriodStart && date < prevPeriodEnd
+    })
+    const prevExpenses = Expenses.filter((expense) => {
+      const date = new Date(expense.creationDate)
+      return date >= prevPeriodStart && date < prevPeriodEnd
+    })
+    const prevInvestments = Investments.filter((investment) => {
+      const date = new Date(investment.creation_date ?? investment.creation_date)
       return date >= prevPeriodStart && date < prevPeriodEnd
     })
 
-    const prevDespesas = despesas.filter((despesa) => {
-      const date = new Date(despesa.creationDate)
-      return date >= prevPeriodStart && date < prevPeriodEnd
-    })
+    const prevTotalEarnings = prevEarnings.reduce((acc, e) => acc + e.value, 0)
+    const prevTotalExpenses = prevExpenses.reduce((acc, e) => acc + e.value, 0)
+    const prevTotalInvestments = prevInvestments.reduce((acc, e) => acc + e.value, 0)
 
-    const prevInvestimentos = investimentos.filter((investimento) => {
-      const date = new Date(investimento.creationDate)
-      return date >= prevPeriodStart && date < prevPeriodEnd
-    })
-
-    // Calcular totais do período anterior
-    const prevTotalGanhos = prevGanhos.reduce((acc, ganho) => acc + ganho.value, 0)
-    const prevTotalDespesas = prevDespesas.reduce((acc, despesa) => acc + despesa.value, 0)
-    const prevTotalInvestimentos = prevInvestimentos.reduce((acc, inv) => acc + inv.value, 0)
-
-    // Calcular percentuais de comparação
-    const ganhosComparison = prevTotalGanhos === 0 ? 100 : ((totalGanhos - prevTotalGanhos) / prevTotalGanhos) * 100
-
-    const despesasComparison =
-      prevTotalDespesas === 0 ? 0 : ((totalDespesas - prevTotalDespesas) / prevTotalDespesas) * 100
-
-    const investimentosComparison =
-      prevTotalInvestimentos === 0
-        ? 100
-        : ((totalInvestimentos - prevTotalInvestimentos) / prevTotalInvestimentos) * 100
+    const earningsComparison = prevTotalEarnings === 0 ? 100 : ((totalEarnings - prevTotalEarnings) / prevTotalEarnings) * 100
+    const expensesComparison = prevTotalExpenses === 0 ? 0 : ((totalExpenses - prevTotalExpenses) / prevTotalExpenses) * 100
+    const investmentsComparison = prevTotalInvestments === 0 ? 100 : ((totalInvestments - prevTotalInvestments) / prevTotalInvestments) * 100
 
     setComparisons({
-      ganhos: Number.parseFloat(ganhosComparison.toFixed(2)),
-      despesas: Number.parseFloat(despesasComparison.toFixed(2)),
-      investimentos: Number.parseFloat(investimentosComparison.toFixed(2)),
-      objetivos: 0, // Não há comparação para objetivos
+      earnings: Number(earningsComparison.toFixed(2)),
+      expenses: Number(expensesComparison.toFixed(2)),
+      investments: Number(investmentsComparison.toFixed(2)),
+      objectives: 0,
     })
-  }, [dateRange, ganhos, despesas, investimentos, objetivos])
+  }, [dateRange, Earnings, Expenses, Investments, Objectives, totalEarnings, totalExpenses, totalInvestments])
 
-  // Preparar dados para os gráficos
-  const despesasPorCategoria = filteredDespesas.reduce(
-    (acc, despesa) => {
-      const categoria = despesa.category || "Sem categoria"
-      if (!acc[categoria]) {
-        acc[categoria] = 0
-      }
-      acc[categoria] += despesa.value
-      return acc
-    },
-    {} as Record<string, number>,
-  )
+  // Dados para gráficos
+  const expensesByCategory = filteredExpenses.reduce<Record<string, number>>((acc, expense) => {
+    const category = expense.category?.toString() || "Sem categoria"
+    acc[category] = (acc[category] ?? 0) + expense.value
+    return acc
+  }, {})
 
-  const despesasPorDia = filteredDespesas.reduce(
-    (acc, despesa) => {
-      const date = new Date(despesa.creationDate)
-      const day = date.toLocaleDateString("pt-BR")
-      if (!acc[day]) {
-        acc[day] = 0
-      }
-      acc[day] += despesa.value
-      return acc
-    },
-    {} as Record<string, number>,
-  )
+  const expensesByDay = filteredExpenses.reduce<Record<string, number>>((acc, expense) => {
+    const day = new Date(expense.creationDate).toLocaleDateString("pt-BR")
+    acc[day] = (acc[day] ?? 0) + expense.value
+    return acc
+  }, {})
 
-  // Verificar se deve mostrar comparações
+  // Mostrar comparações se período for um mês completo e menor que 32 dias
   const showComparisons = (() => {
-    // Se for um mês inteiro (do primeiro ao último dia)
     const isFullMonth =
       dateRange.from.getDate() === 1 &&
       dateRange.to.getDate() === new Date(dateRange.to.getFullYear(), dateRange.to.getMonth() + 1, 0).getDate()
-
-    // Se for um período menor que 32 dias
     const isLessThan32Days = (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24) < 32
-
     return isFullMonth && isLessThan32Days
   })()
 
-  // Animação para os cards
+  // Animação para cards
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: (i: number) => ({
       opacity: 1,
       y: 0,
-      transition: {
-        delay: i * 0.1,
-        duration: 0.5,
-        ease: "easeOut",
-      },
+      transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" },
     }),
   }
 
@@ -162,7 +132,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+        <DateRangePicker date={dateRange} onDateChange={handleDateChange} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -175,20 +145,20 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalGanhos)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalEarnings)}</div>
               {showComparisons && (
                 <div className="flex items-center mt-1">
                   <div
                     className={`flex items-center ${
-                      comparisons.ganhos >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      comparisons.earnings >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                     }`}
                   >
-                    {comparisons.ganhos >= 0 ? (
+                    {comparisons.earnings >= 0 ? (
                       <ArrowUpIcon className="h-4 w-4 mr-1" />
                     ) : (
                       <ArrowDownIcon className="h-4 w-4 mr-1" />
                     )}
-                    <span className="text-sm font-medium">{Math.abs(comparisons.ganhos).toFixed(1)}%</span>
+                    <span className="text-sm font-medium">{Math.abs(comparisons.earnings).toFixed(1)}%</span>
                   </div>
                   <span className="text-xs text-muted-foreground ml-1">vs. período anterior</span>
                 </div>
@@ -206,22 +176,22 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalDespesas)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
               {showComparisons && (
                 <div className="flex items-center mt-1">
                   <div
                     className={`flex items-center ${
-                      comparisons.despesas <= 0
+                      comparisons.expenses <= 0
                         ? "text-green-600 dark:text-green-400"
                         : "text-red-600 dark:text-red-400"
                     }`}
                   >
-                    {comparisons.despesas <= 0 ? (
+                    {comparisons.expenses <= 0 ? (
                       <ArrowDownIcon className="h-4 w-4 mr-1" />
                     ) : (
                       <ArrowUpIcon className="h-4 w-4 mr-1" />
                     )}
-                    <span className="text-sm font-medium">{Math.abs(comparisons.despesas).toFixed(1)}%</span>
+                    <span className="text-sm font-medium">{Math.abs(comparisons.expenses).toFixed(1)}%</span>
                   </div>
                   <span className="text-xs text-muted-foreground ml-1">vs. período anterior</span>
                 </div>
@@ -239,13 +209,15 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalInvestimentos)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalInvestments)}</div>
               {showComparisons && (
                 <p
-                  className={`text-xs ${comparisons.investimentos >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                  className={`text-xs ${
+                    comparisons.investments >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                  }`}
                 >
-                  {comparisons.investimentos >= 0 ? "+" : ""}
-                  {comparisons.investimentos}% em relação ao período anterior
+                  {comparisons.investments >= 0 ? "+" : ""}
+                  {comparisons.investments}% em relação ao período anterior
                 </p>
               )}
             </CardContent>
@@ -261,8 +233,8 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{objetivos.length}</div>
-              <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalObjetivos)}</p>
+              <div className="text-2xl font-bold">{Objectives.length}</div>
+              <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalObjectives)}</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -281,7 +253,12 @@ export default function DashboardPage() {
                 <CardDescription>Distribuição dos seus gastos por categoria no período selecionado</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <PieChart data={Object.entries(despesasPorCategoria).map(([name, value]) => ({ name, value }))} />
+                <PieChart
+                  data={Object.entries(expensesByCategory).map(([name, value]) => ({
+                    name,
+                    value,
+                  }))}
+                />
               </CardContent>
             </Card>
             <Card>
@@ -290,7 +267,12 @@ export default function DashboardPage() {
                 <CardDescription>Evolução dos seus gastos diários no período selecionado</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <BarChart data={Object.entries(despesasPorDia).map(([date, value]) => ({ date, value }))} />
+                <BarChart
+                  data={Object.entries(expensesByDay).map(([date, value]) => ({
+                    date,
+                    value,
+                  }))}
+                />
               </CardContent>
             </Card>
           </div>
@@ -305,18 +287,18 @@ export default function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {filteredGanhos.length > 0 ? (
+                {filteredEarnings.length > 0 ? (
                   <ul className="space-y-2">
-                    {filteredGanhos.slice(0, 5).map((ganho) => (
-                      <li key={ganho.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted">
+                    {filteredEarnings.slice(0, 5).map((earning) => (
+                      <li key={earning.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted">
                         <div>
-                          <p className="font-medium">{ganho.name}</p>
+                          <p className="font-medium">{earning.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(ganho.creationDate).toLocaleDateString("pt-BR")}
+                            {new Date(earning.creationDate).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
                         <span className="font-semibold text-green-600 dark:text-green-400">
-                          {formatCurrency(ganho.value)}
+                          {formatCurrency(earning.value)}
                         </span>
                       </li>
                     ))}
@@ -334,19 +316,19 @@ export default function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {filteredDespesas.length > 0 ? (
+                {filteredExpenses.length > 0 ? (
                   <ul className="space-y-2">
-                    {filteredDespesas.slice(0, 5).map((despesa) => (
-                      <li key={despesa.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted">
+                    {filteredExpenses.slice(0, 5).map((expense) => (
+                      <li key={expense.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted">
                         <div>
-                          <p className="font-medium">{despesa.name}</p>
+                          <p className="font-medium">{expense.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {despesa.category || "Sem categoria"} •{" "}
-                            {new Date(despesa.creationDate).toLocaleDateString("pt-BR")}
+                            {expense.category?.toString() || "Sem categoria"} •{" "}
+                            {new Date(expense.creationDate).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
                         <span className="font-semibold text-red-600 dark:text-red-400">
-                          {formatCurrency(despesa.value)}
+                          {formatCurrency(expense.value)}
                         </span>
                       </li>
                     ))}

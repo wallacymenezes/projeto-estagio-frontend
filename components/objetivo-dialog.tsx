@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useData } from "@/contexts/data-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,39 +21,32 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
-interface Objetivo {
-  id: string
-  name: string
-  target: number
-  term: string
-  creationDate: string
-}
+import type { Objective } from "@/models/Objective"
 
 interface ObjetivoDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  objetivo: Objetivo | null
+  objetivo: Objective | null
 }
 
 export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogProps) {
-  const { addObjetivo, updateObjetivo } = useData()
+  const { addObjective, updateObjective } = useData()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
   const [name, setName] = useState("")
-  const [target, setTarget] = useState("")
+  const [targetValue, setTargetValue] = useState("")
   const [term, setTerm] = useState<Date | undefined>(undefined)
 
-  // Resetar o formulário quando o diálogo é aberto
   useEffect(() => {
     if (open) {
       if (objetivo) {
         setName(objetivo.name)
-        setTarget(objetivo.target.toString())
+        setTargetValue(objetivo.targetValue.toString())
         setTerm(objetivo.term ? new Date(objetivo.term) : undefined)
       } else {
         setName("")
-        setTarget("")
+        setTargetValue("")
         setTerm(undefined)
       }
     }
@@ -64,7 +55,7 @@ export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!name || !target || !term) {
+    if (!name || !targetValue || !term) {
       toast({
         title: "Campos obrigatórios",
         description: "Preencha todos os campos obrigatórios.",
@@ -78,18 +69,18 @@ export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogP
     try {
       const objetivoData = {
         name,
-        target: Number.parseFloat(target),
+        targetValue: Number.parseFloat(targetValue),
         term: term.toISOString(),
       }
 
       if (objetivo) {
-        await updateObjetivo(objetivo.id, objetivoData)
+        await updateObjective(objetivo.id, objetivoData)
         toast({
           title: "Objetivo atualizado",
           description: "O objetivo foi atualizado com sucesso.",
         })
       } else {
-        await addObjetivo(objetivoData)
+        await addObjective(objetivoData)
         toast({
           title: "Objetivo adicionado",
           description: "O objetivo foi adicionado com sucesso.",
@@ -97,10 +88,12 @@ export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogP
       }
 
       onOpenChange(false)
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
-        description: objetivo ? "Não foi possível atualizar o objetivo." : "Não foi possível adicionar o objetivo.",
+        description: objetivo
+          ? "Não foi possível atualizar o objetivo."
+          : "Não foi possível adicionar o objetivo.",
         variant: "destructive",
       })
     } finally {
@@ -132,14 +125,14 @@ export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogP
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="target">Valor Alvo (R$)</Label>
+              <Label htmlFor="targetValue">Valor Alvo (R$)</Label>
               <Input
-                id="target"
+                id="targetValue"
                 type="number"
                 step="0.01"
                 min="0"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
+                value={targetValue}
+                onChange={(e) => setTargetValue(e.target.value)}
                 placeholder="0,00"
                 required
               />

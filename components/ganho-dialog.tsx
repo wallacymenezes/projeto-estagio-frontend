@@ -1,8 +1,7 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
+import type { Earning } from "@/models/Earning"
 import { useData } from "@/contexts/data-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,47 +19,37 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 
-interface Ganho {
-  id: string
-  name: string
-  description: string
-  value: number
-  wage: boolean
-  creationDate: string
-}
-
 interface GanhoDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  ganho: Ganho | null
+  ganho: Earning | null
 }
 
 export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
-  const { addGanho, updateGanho } = useData()
+  const { addEarning, updateEarning } = useData()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [value, setValue] = useState("")
-  const [date, setDate] = useState<Date | undefined>(new Date())
   const [wage, setWage] = useState(false)
+  const [date, setDate] = useState<Date>(new Date())
 
-  // Resetar o formulário quando o diálogo é aberto
   useEffect(() => {
     if (open) {
       if (ganho) {
         setName(ganho.name)
-        setDescription(ganho.description)
+        setDescription(ganho.description ?? "")
         setValue(ganho.value.toString())
-        setDate(new Date(ganho.creationDate))
         setWage(ganho.wage)
+        setDate(new Date(ganho.creationDate))
       } else {
         setName("")
         setDescription("")
         setValue("")
-        setDate(new Date())
         setWage(false)
+        setDate(new Date())
       }
     }
   }, [open, ganho])
@@ -68,7 +57,7 @@ export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!name || !value || !date) {
+    if (!name || !value) {
       toast({
         title: "Campos obrigatórios",
         description: "Preencha todos os campos obrigatórios.",
@@ -85,16 +74,17 @@ export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
         description,
         value: Number.parseFloat(value),
         wage,
+        creationDate: date.toISOString(),
       }
 
       if (ganho) {
-        await updateGanho(ganho.id, ganhoData)
+        await updateEarning(ganho.id, ganhoData)
         toast({
           title: "Ganho atualizado",
           description: "O ganho foi atualizado com sucesso.",
         })
       } else {
-        await addGanho(ganhoData)
+        await addEarning(ganhoData)
         toast({
           title: "Ganho adicionado",
           description: "O ganho foi adicionado com sucesso.",

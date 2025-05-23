@@ -22,20 +22,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { toast } from "@/components/ui/use-toast"
-
-interface Ganho {
-  id: string
-  descricao: string
-  valor: number
-  data: string
-  recorrente: boolean
-}
+import type { Earning } from "@/models/Earning" // Importa o tipo correto do modelo
 
 export default function GanhosPage() {
-  const { ganhos, fetchGanhos, deleteGanho } = useData()
+  // Usar nomes e tipos do contexto correto:
+  const { Earnings, fetchEarnings, deleteEarning } = useData()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedGanho, setSelectedGanho] = useState<Ganho | null>(null)
-  const [filteredGanhos, setFilteredGanhos] = useState<Ganho[]>([])
+  const [selectedGanho, setSelectedGanho] = useState<Earning | null>(null) // Ajuste do tipo para Earning
+  const [filteredGanhos, setFilteredGanhos] = useState<Earning[]>([])
   const [dateRange, setDateRange] = useState<{
     from: Date
     to: Date
@@ -45,26 +39,33 @@ export default function GanhosPage() {
   })
 
   useEffect(() => {
-    fetchGanhos()
-  }, [fetchGanhos])
+    fetchEarnings()
+  }, [fetchEarnings])
 
   useEffect(() => {
     setFilteredGanhos(
-      ganhos.filter((ganho) => {
-        const date = new Date(ganho.data)
+      Earnings.filter((ganho) => {
+        const date = new Date(ganho.creationDate)
         return date >= dateRange.from && date <= dateRange.to
       }),
     )
-  }, [ganhos, dateRange])
+  }, [Earnings, dateRange])
 
-  const handleEdit = (ganho: Ganho) => {
+  // Função intermediária para corrigir problema do DateRangePicker
+  function handleDateChange(range: { from?: Date; to?: Date }) {
+    if (range.from && range.to) {
+      setDateRange({ from: range.from, to: range.to })
+    }
+  }
+
+  const handleEdit = (ganho: Earning) => {
     setSelectedGanho(ganho)
     setIsDialogOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     try {
-      await deleteGanho(id)
+      await deleteEarning(id)
       toast({
         title: "Ganho excluído",
         description: "O ganho foi excluído com sucesso.",
@@ -78,40 +79,41 @@ export default function GanhosPage() {
     }
   }
 
-  const columns: ColumnDef<Ganho>[] = [
+  const columns: ColumnDef<Earning>[] = [
     {
-      accessorKey: "descricao",
+      accessorKey: "name",
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
           Descrição
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
+      cell: ({ row }) => row.getValue("name"),
     },
     {
-      accessorKey: "valor",
+      accessorKey: "value",
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
           Valor
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => formatCurrency(row.getValue("valor")),
+      cell: ({ row }) => formatCurrency(row.getValue("value")),
     },
     {
-      accessorKey: "data",
+      accessorKey: "creationDate",
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
           Data
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => new Date(row.getValue("data")).toLocaleDateString("pt-BR"),
+      cell: ({ row }) => new Date(row.getValue("creationDate")).toLocaleDateString("pt-BR"),
     },
     {
-      accessorKey: "recorrente",
+      accessorKey: "wage",
       header: "Recorrente",
-      cell: ({ row }) => (row.getValue("recorrente") ? "Sim" : "Não"),
+      cell: ({ row }) => (row.getValue("wage") ? "Sim" : "Não"),
     },
     {
       id: "actions",
@@ -140,7 +142,10 @@ export default function GanhosPage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDelete(ganho.id)} className="bg-red-600 hover:bg-red-700">
+                  <AlertDialogAction
+                    onClick={() => handleDelete(ganho.id)}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
                     Excluir
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -152,14 +157,14 @@ export default function GanhosPage() {
     },
   ]
 
-  const totalGanhos = filteredGanhos.reduce((acc, ganho) => acc + ganho.valor, 0)
+  const totalGanhos = filteredGanhos.reduce((acc, ganho) => acc + ganho.value, 0)
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Ganhos</h1>
         <div className="flex flex-col sm:flex-row gap-4">
-          <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+          <DateRangePicker date={dateRange} onDateChange={handleDateChange} />
           <Button
             onClick={() => {
               setSelectedGanho(null)
@@ -211,7 +216,7 @@ export default function GanhosPage() {
           <DataTable
             columns={columns}
             data={filteredGanhos}
-            searchColumn="descricao"
+            searchColumn="name"
             searchPlaceholder="Filtrar por descrição..."
           />
         </CardContent>

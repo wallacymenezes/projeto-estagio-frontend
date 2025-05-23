@@ -4,7 +4,7 @@ import axios from "axios"
 
 // Criar uma instância do axios com configurações padrão
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333",
+  baseURL: 'https://backend-estagio-unisuam.onrender.com',
   headers: {
     "Content-Type": "application/json",
   },

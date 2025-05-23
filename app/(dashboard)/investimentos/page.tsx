@@ -22,57 +22,49 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { toast } from "@/components/ui/use-toast"
-import { Progress } from "@/components/ui/progress"
-
-interface Investimento {
-  id: string
-  nome: string
-  valor: number
-  dataInicio: string
-  dataFim: string | null
-  rendimento: number
-  status: "ativo" | "finalizado"
-}
+import type { Investment } from "@/models/Investment"
+import type { DateRange } from "@/components/date-range-picker"
 
 export default function InvestimentosPage() {
-  const { investimentos, fetchInvestimentos, deleteInvestimento } = useData()
+  const { Investments, fetchInvestments, deleteInvestment } = useData()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedInvestimento, setSelectedInvestimento] = useState<Investimento | null>(null)
-  const [filteredInvestimentos, setFilteredInvestimentos] = useState<Investimento[]>([])
-  const [dateRange, setDateRange] = useState<{
-    from: Date
-    to: Date
-  }>({
+  const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null)
+  const [filteredInvestments, setFilteredInvestments] = useState<Investment[]>([])
+
+  // Inicialize dateRange como DateRange para compatibilidade
+  const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   })
 
   useEffect(() => {
-    fetchInvestimentos()
-  }, [fetchInvestimentos])
+    fetchInvestments()
+  }, [fetchInvestments])
 
   useEffect(() => {
-    setFilteredInvestimentos(
-      investimentos.filter((investimento) => {
-        const date = new Date(investimento.dataInicio)
+    setFilteredInvestments(
+      Investments.filter((investment) => {
+        const date = new Date(investment.creation_date)
+        // Verifica se from e to existem antes de comparar
+        if (!dateRange.from || !dateRange.to) return true
         return date >= dateRange.from && date <= dateRange.to
       }),
     )
-  }, [investimentos, dateRange])
+  }, [Investments, dateRange])
 
-  const handleEdit = (investimento: Investimento) => {
-    setSelectedInvestimento(investimento)
+  const handleEdit = (investment: Investment) => {
+    setSelectedInvestment(investment)
     setIsDialogOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     try {
-      await deleteInvestimento(id)
+      await deleteInvestment(id)
       toast({
         title: "Investimento excluído",
         description: "O investimento foi excluído com sucesso.",
       })
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro ao excluir",
         description: "Não foi possível excluir o investimento.",
@@ -81,9 +73,9 @@ export default function InvestimentosPage() {
     }
   }
 
-  const columns: ColumnDef<Investimento>[] = [
+  const columns: ColumnDef<Investment>[] = [
     {
-      accessorKey: "nome",
+      accessorKey: "name",
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
           Nome
@@ -92,66 +84,43 @@ export default function InvestimentosPage() {
       ),
     },
     {
-      accessorKey: "valor",
+      accessorKey: "value",
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
           Valor
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => formatCurrency(row.getValue("valor")),
+      cell: ({ row }) => formatCurrency(row.getValue("value")),
     },
     {
-      accessorKey: "rendimento",
+      accessorKey: "percentage",
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Rendimento
+          Rendimento (%)
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => `${row.getValue("rendimento")}%`,
+      cell: ({ row }) => `${row.getValue("percentage")}%`,
     },
     {
-      accessorKey: "dataInicio",
+      accessorKey: "creation_date",
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
           Data Início
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => new Date(row.getValue("dataInicio")).toLocaleDateString("pt-BR"),
-    },
-    {
-      accessorKey: "status",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Status
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => {
-        const status = row.getValue("status") as string
-        return (
-          <div
-            className={`px-2 py-1 rounded-full text-xs font-medium inline-block ${
-              status === "ativo"
-                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
-            }`}
-          >
-            {status === "ativo" ? "Ativo" : "Finalizado"}
-          </div>
-        )
-      },
+      cell: ({ row }) => new Date(row.getValue("creation_date")).toLocaleDateString("pt-BR"),
     },
     {
       id: "actions",
       cell: ({ row }) => {
-        const investimento = row.original
+        const investment = row.original
 
         return (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => handleEdit(investimento)}>
+            <Button variant="ghost" size="icon" onClick={() => handleEdit(investment)}>
               <Edit className="h-4 w-4" />
               <span className="sr-only">Editar</span>
             </Button>
@@ -172,7 +141,7 @@ export default function InvestimentosPage() {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => handleDelete(investimento.id)}
+                    onClick={() => handleDelete(investment.id)}
                     className="bg-red-600 hover:bg-red-700"
                   >
                     Excluir
@@ -186,12 +155,8 @@ export default function InvestimentosPage() {
     },
   ]
 
-  const totalInvestimentos = filteredInvestimentos.reduce((acc, inv) => acc + inv.valor, 0)
-  const totalRendimentos = filteredInvestimentos.reduce((acc, inv) => {
-    const rendimento = (inv.valor * inv.rendimento) / 100
-    return acc + rendimento
-  }, 0)
-  const investimentosAtivos = filteredInvestimentos.filter((inv) => inv.status === "ativo")
+  const totalInvested = filteredInvestments.reduce((acc, inv) => acc + inv.value, 0)
+  const totalExpectedReturn = filteredInvestments.reduce((acc, inv) => acc + (inv.value * inv.percentage) / 100, 0)
 
   return (
     <div className="space-y-6">
@@ -201,7 +166,7 @@ export default function InvestimentosPage() {
           <DateRangePicker date={dateRange} onDateChange={setDateRange} />
           <Button
             onClick={() => {
-              setSelectedInvestimento(null)
+              setSelectedInvestment(null)
               setIsDialogOpen(true)
             }}
             className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600"
@@ -212,14 +177,14 @@ export default function InvestimentosPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Investido</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {formatCurrency(totalInvestimentos)}
+              {formatCurrency(totalInvested)}
             </div>
           </CardContent>
         </Card>
@@ -229,22 +194,8 @@ export default function InvestimentosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {formatCurrency(totalRendimentos)}
+              {formatCurrency(totalExpectedReturn)}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Investimentos Ativos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {investimentosAtivos.length} de {filteredInvestimentos.length}
-            </div>
-            <Progress
-              value={(investimentosAtivos.length / filteredInvestimentos.length) * 100 || 0}
-              className="h-2 mt-2"
-            />
           </CardContent>
         </Card>
       </div>
@@ -257,14 +208,14 @@ export default function InvestimentosPage() {
         <CardContent>
           <DataTable
             columns={columns}
-            data={filteredInvestimentos}
-            searchColumn="nome"
+            data={filteredInvestments}
+            searchColumn="name"
             searchPlaceholder="Filtrar por nome..."
           />
         </CardContent>
       </Card>
 
-      <InvestimentoDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} investimento={selectedInvestimento} />
+      <InvestimentoDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} investimento={selectedInvestment} />
     </div>
   )
 }
