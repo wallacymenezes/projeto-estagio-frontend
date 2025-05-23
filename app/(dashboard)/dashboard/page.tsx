@@ -1,122 +1,211 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useData } from "@/contexts/data-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DateRangePicker } from "@/components/date-range-picker"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart, PieChart } from "@/components/charts"
-import { formatCurrency } from "@/lib/utils"
-import { motion } from "framer-motion"
-import { ArrowDownIcon, ArrowUpIcon, BanknoteIcon, CoinsIcon, LineChartIcon, TargetIcon } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useData } from "@/contexts/data-context";
+import { useAuth } from "@/contexts/auth-context";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { DateRangePicker } from "@/components/date-range-picker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart, PieChart } from "@/components/charts";
+import { formatCurrency } from "@/lib/utils";
+import { motion } from "framer-motion";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  BanknoteIcon,
+  CoinsIcon,
+  LineChartIcon,
+  TargetIcon,
+} from "lucide-react";
 
 export default function DashboardPage() {
-  const { Earnings, Expenses, Investments, Objectives, fetchEarnings, fetchExpenses, fetchInvestments, fetchObjectives } = useData()
+  const {
+    Earnings,
+    Expenses,
+    Investments,
+    Objectives,
+    fetchEarnings,
+    fetchExpenses,
+    fetchInvestments,
+    fetchObjectives,
+  } = useData();
 
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
-  })
+  });
 
   const [comparisons, setComparisons] = useState({
     earnings: 0,
     expenses: 0,
     investments: 0,
     objectives: 0,
-  })
+  });
+
+  const { user, loading } = useAuth();
 
   // Função intermediária para garantir que from e to não são undefined
   function handleDateChange(range: { from?: Date; to?: Date }) {
     if (range.from && range.to) {
-      setDateRange({ from: range.from, to: range.to })
+      setDateRange({ from: range.from, to: range.to });
     }
   }
 
   useEffect(() => {
-    fetchEarnings()
-    fetchExpenses()
-    fetchInvestments()
-    fetchObjectives()
-  }, [fetchEarnings, fetchExpenses, fetchInvestments, fetchObjectives])
+    if (!loading && user?.userId && user?.token) {
+      console.log("Fazendo fetch dos dados...");
+
+      const fetchData = async () => {
+        try {
+          await Promise.all([
+            fetchEarnings(),
+            fetchExpenses(),
+            fetchInvestments(),
+            fetchObjectives(),
+          ]);
+          console.log("Fetch concluído");
+        } catch (error) {
+          console.error("Erro no fetch:", error);
+        }
+      };
+      fetchData();
+    }
+  }, [fetchEarnings, fetchExpenses, fetchInvestments, fetchObjectives]);
 
   // Filtrar dados pelo intervalo de datas
   const filteredEarnings = Earnings.filter((earning) => {
-    const date = new Date(earning.creationDate)
-    return date >= dateRange.from && date <= dateRange.to
-  })
+    const date = new Date(earning.creationDate);
+    return date >= dateRange.from && date <= dateRange.to;
+  });
 
   const filteredExpenses = Expenses.filter((expense) => {
-    const date = new Date(expense.creationDate)
-    return date >= dateRange.from && date <= dateRange.to
-  })
+    const date = new Date(expense.creationDate);
+    return date >= dateRange.from && date <= dateRange.to;
+  });
 
   const filteredInvestments = Investments.filter((investment) => {
-    const date = new Date(investment.creation_date ?? investment.creation_date)
-    return date >= dateRange.from && date <= dateRange.to
-  })
+    const date = new Date(investment.creation_date ?? investment.creation_date);
+    return date >= dateRange.from && date <= dateRange.to;
+  });
 
   // Calcular totais
-  const totalEarnings = filteredEarnings.reduce((acc, earning) => acc + earning.value, 0)
-  const totalExpenses = filteredExpenses.reduce((acc, expense) => acc + expense.value, 0)
-  const totalInvestments = filteredInvestments.reduce((acc, investment) => acc + investment.value, 0)
-  const totalObjectives = Objectives.reduce((acc, obj) => acc + (obj.targetValue ?? 0), 0)
+  const totalEarnings = filteredEarnings.reduce(
+    (acc, earning) => acc + earning.value,
+    0
+  );
+  const totalExpenses = filteredExpenses.reduce(
+    (acc, expense) => acc + expense.value,
+    0
+  );
+  const totalInvestments = filteredInvestments.reduce(
+    (acc, investment) => acc + investment.value,
+    0
+  );
+  const totalObjectives = Objectives.reduce(
+    (acc, obj) => acc + (obj.targetValue ?? 0),
+    0
+  );
 
   // Comparações com período anterior
   useEffect(() => {
-    const duration = dateRange.to.getTime() - dateRange.from.getTime()
-    const prevPeriodEnd = new Date(dateRange.from)
-    const prevPeriodStart = new Date(prevPeriodEnd.getTime() - duration)
+    const duration = dateRange.to.getTime() - dateRange.from.getTime();
+    const prevPeriodEnd = new Date(dateRange.from);
+    const prevPeriodStart = new Date(prevPeriodEnd.getTime() - duration);
 
     const prevEarnings = Earnings.filter((earning) => {
-      const date = new Date(earning.creationDate)
-      return date >= prevPeriodStart && date < prevPeriodEnd
-    })
+      const date = new Date(earning.creationDate);
+      return date >= prevPeriodStart && date < prevPeriodEnd;
+    });
     const prevExpenses = Expenses.filter((expense) => {
-      const date = new Date(expense.creationDate)
-      return date >= prevPeriodStart && date < prevPeriodEnd
-    })
+      const date = new Date(expense.creationDate);
+      return date >= prevPeriodStart && date < prevPeriodEnd;
+    });
     const prevInvestments = Investments.filter((investment) => {
-      const date = new Date(investment.creation_date ?? investment.creation_date)
-      return date >= prevPeriodStart && date < prevPeriodEnd
-    })
+      const date = new Date(
+        investment.creation_date ?? investment.creation_date
+      );
+      return date >= prevPeriodStart && date < prevPeriodEnd;
+    });
 
-    const prevTotalEarnings = prevEarnings.reduce((acc, e) => acc + e.value, 0)
-    const prevTotalExpenses = prevExpenses.reduce((acc, e) => acc + e.value, 0)
-    const prevTotalInvestments = prevInvestments.reduce((acc, e) => acc + e.value, 0)
+    const prevTotalEarnings = prevEarnings.reduce((acc, e) => acc + e.value, 0);
+    const prevTotalExpenses = prevExpenses.reduce((acc, e) => acc + e.value, 0);
+    const prevTotalInvestments = prevInvestments.reduce(
+      (acc, e) => acc + e.value,
+      0
+    );
 
-    const earningsComparison = prevTotalEarnings === 0 ? 100 : ((totalEarnings - prevTotalEarnings) / prevTotalEarnings) * 100
-    const expensesComparison = prevTotalExpenses === 0 ? 0 : ((totalExpenses - prevTotalExpenses) / prevTotalExpenses) * 100
-    const investmentsComparison = prevTotalInvestments === 0 ? 100 : ((totalInvestments - prevTotalInvestments) / prevTotalInvestments) * 100
+    const earningsComparison =
+      prevTotalEarnings === 0
+        ? 100
+        : ((totalEarnings - prevTotalEarnings) / prevTotalEarnings) * 100;
+    const expensesComparison =
+      prevTotalExpenses === 0
+        ? 0
+        : ((totalExpenses - prevTotalExpenses) / prevTotalExpenses) * 100;
+    const investmentsComparison =
+      prevTotalInvestments === 0
+        ? 100
+        : ((totalInvestments - prevTotalInvestments) / prevTotalInvestments) *
+          100;
 
     setComparisons({
       earnings: Number(earningsComparison.toFixed(2)),
       expenses: Number(expensesComparison.toFixed(2)),
       investments: Number(investmentsComparison.toFixed(2)),
       objectives: 0,
-    })
-  }, [dateRange, Earnings, Expenses, Investments, Objectives, totalEarnings, totalExpenses, totalInvestments])
+    });
+  }, [
+    dateRange,
+    Earnings,
+    Expenses,
+    Investments,
+    Objectives,
+    totalEarnings,
+    totalExpenses,
+    totalInvestments,
+  ]);
 
   // Dados para gráficos
-  const expensesByCategory = filteredExpenses.reduce<Record<string, number>>((acc, expense) => {
-    const category = expense.category?.toString() || "Sem categoria"
-    acc[category] = (acc[category] ?? 0) + expense.value
-    return acc
-  }, {})
+  const expensesByCategory = filteredExpenses.reduce<Record<string, number>>(
+    (acc, expense) => {
+      const category = expense.category?.toString() || "Sem categoria";
+      acc[category] = (acc[category] ?? 0) + expense.value;
+      return acc;
+    },
+    {}
+  );
 
-  const expensesByDay = filteredExpenses.reduce<Record<string, number>>((acc, expense) => {
-    const day = new Date(expense.creationDate).toLocaleDateString("pt-BR")
-    acc[day] = (acc[day] ?? 0) + expense.value
-    return acc
-  }, {})
+  const expensesByDay = filteredExpenses.reduce<Record<string, number>>(
+    (acc, expense) => {
+      const day = new Date(expense.creationDate).toLocaleDateString("pt-BR");
+      acc[day] = (acc[day] ?? 0) + expense.value;
+      return acc;
+    },
+    {}
+  );
 
   // Mostrar comparações se período for um mês completo e menor que 32 dias
   const showComparisons = (() => {
     const isFullMonth =
       dateRange.from.getDate() === 1 &&
-      dateRange.to.getDate() === new Date(dateRange.to.getFullYear(), dateRange.to.getMonth() + 1, 0).getDate()
-    const isLessThan32Days = (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24) < 32
-    return isFullMonth && isLessThan32Days
-  })()
+      dateRange.to.getDate() ===
+        new Date(
+          dateRange.to.getFullYear(),
+          dateRange.to.getMonth() + 1,
+          0
+        ).getDate();
+    const isLessThan32Days =
+      (dateRange.to.getTime() - dateRange.from.getTime()) /
+        (1000 * 60 * 60 * 24) <
+      32;
+    return isFullMonth && isLessThan32Days;
+  })();
 
   // Animação para cards
   const cardVariants = {
@@ -126,7 +215,7 @@ export default function DashboardPage() {
       y: 0,
       transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" },
     }),
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -136,21 +225,32 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={0}>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={0}
+        >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total de Ganhos</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total de Ganhos
+              </CardTitle>
               <div className="rounded-full p-2 bg-green-100 dark:bg-green-900">
                 <ArrowUpIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalEarnings)}</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(totalEarnings)}
+              </div>
               {showComparisons && (
                 <div className="flex items-center mt-1">
                   <div
                     className={`flex items-center ${
-                      comparisons.earnings >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      comparisons.earnings >= 0
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
                     }`}
                   >
                     {comparisons.earnings >= 0 ? (
@@ -158,25 +258,38 @@ export default function DashboardPage() {
                     ) : (
                       <ArrowDownIcon className="h-4 w-4 mr-1" />
                     )}
-                    <span className="text-sm font-medium">{Math.abs(comparisons.earnings).toFixed(1)}%</span>
+                    <span className="text-sm font-medium">
+                      {Math.abs(comparisons.earnings).toFixed(1)}%
+                    </span>
                   </div>
-                  <span className="text-xs text-muted-foreground ml-1">vs. período anterior</span>
+                  <span className="text-xs text-muted-foreground ml-1">
+                    vs. período anterior
+                  </span>
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={1}
+        >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total de Gastos</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total de Gastos
+              </CardTitle>
               <div className="rounded-full p-2 bg-red-100 dark:bg-red-900">
                 <ArrowDownIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(totalExpenses)}
+              </div>
               {showComparisons && (
                 <div className="flex items-center mt-1">
                   <div
@@ -191,29 +304,44 @@ export default function DashboardPage() {
                     ) : (
                       <ArrowUpIcon className="h-4 w-4 mr-1" />
                     )}
-                    <span className="text-sm font-medium">{Math.abs(comparisons.expenses).toFixed(1)}%</span>
+                    <span className="text-sm font-medium">
+                      {Math.abs(comparisons.expenses).toFixed(1)}%
+                    </span>
                   </div>
-                  <span className="text-xs text-muted-foreground ml-1">vs. período anterior</span>
+                  <span className="text-xs text-muted-foreground ml-1">
+                    vs. período anterior
+                  </span>
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={2}>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={2}
+        >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Investimentos Ativos</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Investimentos Ativos
+              </CardTitle>
               <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900">
                 <LineChartIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalInvestments)}</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(totalInvestments)}
+              </div>
               {showComparisons && (
                 <p
                   className={`text-xs ${
-                    comparisons.investments >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    comparisons.investments >= 0
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-red-600 dark:text-red-400"
                   }`}
                 >
                   {comparisons.investments >= 0 ? "+" : ""}
@@ -224,17 +352,26 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
 
-        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={3}>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={3}
+        >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Objetivos Cadastrados</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Objetivos Cadastrados
+              </CardTitle>
               <div className="rounded-full p-2 bg-purple-100 dark:bg-purple-900">
                 <TargetIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{Objectives.length}</div>
-              <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalObjectives)}</p>
+              <p className="text-xs text-muted-foreground">
+                Total: {formatCurrency(totalObjectives)}
+              </p>
             </CardContent>
           </Card>
         </motion.div>
@@ -250,21 +387,28 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Gastos por Categoria</CardTitle>
-                <CardDescription>Distribuição dos seus gastos por categoria no período selecionado</CardDescription>
+                <CardDescription>
+                  Distribuição dos seus gastos por categoria no período
+                  selecionado
+                </CardDescription>
               </CardHeader>
               <CardContent className="h-80">
                 <PieChart
-                  data={Object.entries(expensesByCategory).map(([name, value]) => ({
-                    name,
-                    value,
-                  }))}
+                  data={Object.entries(expensesByCategory).map(
+                    ([name, value]) => ({
+                      name,
+                      value,
+                    })
+                  )}
                 />
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
                 <CardTitle>Gastos por Dia</CardTitle>
-                <CardDescription>Evolução dos seus gastos diários no período selecionado</CardDescription>
+                <CardDescription>
+                  Evolução dos seus gastos diários no período selecionado
+                </CardDescription>
               </CardHeader>
               <CardContent className="h-80">
                 <BarChart
@@ -290,11 +434,16 @@ export default function DashboardPage() {
                 {filteredEarnings.length > 0 ? (
                   <ul className="space-y-2">
                     {filteredEarnings.slice(0, 5).map((earning) => (
-                      <li key={earning.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted">
+                      <li
+                        key={earning.id}
+                        className="flex justify-between items-center p-2 rounded-md hover:bg-muted"
+                      >
                         <div>
                           <p className="font-medium">{earning.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(earning.creationDate).toLocaleDateString("pt-BR")}
+                            {new Date(earning.creationDate).toLocaleDateString(
+                              "pt-BR"
+                            )}
                           </p>
                         </div>
                         <span className="font-semibold text-green-600 dark:text-green-400">
@@ -304,7 +453,9 @@ export default function DashboardPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground text-center py-4">Nenhum ganho no período selecionado</p>
+                  <p className="text-muted-foreground text-center py-4">
+                    Nenhum ganho no período selecionado
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -319,12 +470,17 @@ export default function DashboardPage() {
                 {filteredExpenses.length > 0 ? (
                   <ul className="space-y-2">
                     {filteredExpenses.slice(0, 5).map((expense) => (
-                      <li key={expense.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted">
+                      <li
+                        key={expense.id}
+                        className="flex justify-between items-center p-2 rounded-md hover:bg-muted"
+                      >
                         <div>
                           <p className="font-medium">{expense.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {expense.category?.toString() || "Sem categoria"} •{" "}
-                            {new Date(expense.creationDate).toLocaleDateString("pt-BR")}
+                            {new Date(expense.creationDate).toLocaleDateString(
+                              "pt-BR"
+                            )}
                           </p>
                         </div>
                         <span className="font-semibold text-red-600 dark:text-red-400">
@@ -334,7 +490,9 @@ export default function DashboardPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground text-center py-4">Nenhum gasto no período selecionado</p>
+                  <p className="text-muted-foreground text-center py-4">
+                    Nenhum gasto no período selecionado
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -342,5 +500,5 @@ export default function DashboardPage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
