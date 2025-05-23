@@ -14,6 +14,7 @@ import { Objective } from "@/models/Objective";
 import { Category } from "@/models/Category";
 import { atualizar, buscar, register, deletar } from "@/Service/Service";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "./auth-context";
 
 // Context Type
 interface DataContextType {
@@ -71,34 +72,10 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  // Aqui você pode substituir esta linha para obter o token do seu contexto/auth provider
-  const token =
-    typeof window !== "undefined"
-      ? (() => {
-          try {
-            const userStr = localStorage.getItem("user");
-            if (!userStr) return "";
-            const user = JSON.parse(userStr);
-            return user?.token ?? "";
-          } catch {
-            return "";
-          }
-        })()
-      : "";
 
-  const userId =
-    typeof window !== "undefined"
-      ? (() => {
-          try {
-            const userStr = localStorage.getItem("user");
-            if (!userStr) return "";
-            const user = JSON.parse(userStr);
-            return user?.id ?? ""; // Supondo que o ID esteja em `user.id`
-          } catch {
-            return "";
-          }
-        })()
-      : "";
+  const { user } = useAuth();
+  const token = user?.token || "";
+  const userId = user?.userId || "";
 
   const [Earnings, setEarnings] = useState<Earning[]>([]);
   const [Expenses, setExpenses] = useState<Expense[]>([]);
@@ -109,7 +86,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Earnings
   const fetchEarnings = useCallback(async () => {
     try {
-      const data = await buscar("/earnings", token);
+      const data = await buscar(`/earnings/user/${userId}`, token);
       setEarnings(data);
     } catch (error: any) {
       toast({
@@ -147,7 +124,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await atualizar(
         `/earnings/${id}`,
-        { ...earning, userId },
+        { ...earning, id, userId },
         token
       );
       setEarnings((prev) => prev.map((e) => (e.id === id ? updated : e)));
@@ -179,7 +156,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Expenses
   const fetchExpenses = useCallback(async () => {
     try {
-      const data = await buscar("/expenses", token);
+      const data = await buscar(`/expenses/user/${userId}`, token);
       setExpenses(data);
     } catch (error: any) {
       toast({
@@ -193,7 +170,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const addExpense = async (expense: Omit<Expense, "id" | "creationDate">) => {
     try {
-      const newExpense = await register("/expenses", expense, token);
+      const expensePayload = {
+        ...expense,
+        userId,
+        category: typeof expense.category === 'object' && expense.category?.id 
+          ? expense.category.id 
+          : expense.category
+      };
+
+      const newExpense = await register("/expenses", expensePayload, token);
       setExpenses((prev) => [...prev, newExpense]);
       return newExpense;
     } catch (error: any) {
@@ -211,7 +196,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     expense: Partial<Omit<Expense, "id" | "creationDate">>
   ) => {
     try {
-      const updated = await atualizar(`/expenses/${id}`, expense, token);
+      const updated = await atualizar(`/expenses/${id}`, { ...expense, id, userId }, token);
       setExpenses((prev) => prev.map((e) => (e.id === id ? updated : e)));
       return updated;
     } catch (error: any) {
@@ -241,7 +226,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Investments
   const fetchInvestments = useCallback(async () => {
     try {
-      const data = await buscar("/investments", token);
+      const data = await buscar(`/investments/user/${userId}`, token);
       setInvestments(data);
     } catch (error: any) {
       toast({
@@ -257,7 +242,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     investment: Omit<Investment, "id" | "creationDate">
   ) => {
     try {
-      const newInvestment = await register("/investments", investment, token);
+      const newInvestment = await register("/investments", { ...investment, userId }, token);
       setInvestments((prev) => [...prev, newInvestment]);
       return newInvestment;
     } catch (error: any) {
@@ -275,7 +260,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     investment: Partial<Omit<Investment, "id" | "creationDate">>
   ) => {
     try {
-      const updated = await atualizar(`/investments/${id}`, investment, token);
+      const updated = await atualizar(`/investments/${id}`, { ...investment, id, userId }, token);
       setInvestments((prev) => prev.map((i) => (i.id === id ? updated : i)));
       return updated;
     } catch (error: any) {
@@ -305,7 +290,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Objectives
   const fetchObjectives = useCallback(async () => {
     try {
-      const data = await buscar("/objectives", token);
+      const data = await buscar(`/objectives/user/${userId}`, token);
       setObjectives(data);
     } catch (error: any) {
       toast({
@@ -321,7 +306,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     objective: Omit<Objective, "id" | "creationDate">
   ) => {
     try {
-      const newObjective = await register("/objectives", objective, token);
+      const newObjective = await register("/objectives", { ...objective, userId }, token);
       setObjectives((prev) => [...prev, newObjective]);
       return newObjective;
     } catch (error: any) {
@@ -339,7 +324,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     objective: Partial<Omit<Objective, "id" | "creationDate">>
   ) => {
     try {
-      const updated = await atualizar(`/objectives/${id}`, objective, token);
+      const updated = await atualizar(`/objectives/${id}`, { ...objective, id, userId }, token);
       setObjectives((prev) => prev.map((o) => (o.id === id ? updated : o)));
       return updated;
     } catch (error: any) {
@@ -369,7 +354,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Categorys
   const fetchCategorys = useCallback(async () => {
     try {
-      const data = await buscar("/categories", token);
+      const data = await buscar(`/categories/user/${userId}`, token);
       setCategorys(data);
     } catch (error: any) {
       toast({
@@ -383,7 +368,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const addCategory = async (category: Omit<Category, "id">) => {
     try {
-      const newCategory = await register("/categories", category, token);
+      const newCategory = await register("/categories", { ...category, userId }, token);
       setCategorys((prev) => [...prev, newCategory]);
       return newCategory;
     } catch (error: any) {
@@ -401,7 +386,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     category: Partial<Omit<Category, "id">>
   ) => {
     try {
-      const updated = await atualizar(`/categories/${id}`, category, token);
+      const updated = await atualizar(`/categories`, { ...category, id, userId }, token);
       setCategorys((prev) => prev.map((c) => (c.id === id ? updated : c)));
       return updated;
     } catch (error: any) {
