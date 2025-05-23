@@ -36,7 +36,7 @@ const ClientOnly = ({ children }: { children: React.ReactNode }) => {
 // Create a client-only auth form component
 const LoginForm = () => {
   // Now we can safely use hooks here
-  const { handleLogin } = useAuth()
+  const { user, handleLogin } = useAuth()
   const router = useRouter()
   //const { toast } = useToast()
 
@@ -48,6 +48,13 @@ const LoginForm = () => {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
+  /*useEffect(() => {
+        if (user?.token !== "") {
+            router.push("/dashboard")
+            setLoading(false)
+        }
+    }, [user]);
+    */
   // Em seu LoginForm
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

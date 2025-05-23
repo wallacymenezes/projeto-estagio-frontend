@@ -1,10 +1,9 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useData } from "@/contexts/data-context"
-import { Button } from "@/components/ui/button"
+import type React from "react";
+import { useState, useEffect } from "react";
+import { useData } from "@/contexts/data-context";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,25 +11,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
 
-interface Categoria {
-  id: string
-  name: string
-  description: string | null
-  color: string
-}
-
-interface CategoriaDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  categoria: Categoria | null
-}
+import type { Category } from "@/models/Category";
 
 // Lista de cores predefinidas
 const CORES_PREDEFINIDAS = [
@@ -51,78 +39,86 @@ const CORES_PREDEFINIDAS = [
   "#e879f9", // fuchsia-400
   "#f472b6", // pink-400
   "#fb7185", // rose-400
-]
+];
+
+interface CategoriaDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  categoria: Category | null;
+}
 
 export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDialogProps) {
-  const { addCategory, updateCategory } = useData()
-  const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
+  const { addCategory, updateCategory } = useData();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
 
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [color, setColor] = useState(CORES_PREDEFINIDAS[0])
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [color, setColor] = useState(CORES_PREDEFINIDAS[0]);
 
   // Resetar o formulário quando o diálogo é aberto
   useEffect(() => {
     if (open) {
       if (categoria) {
-        setName(categoria.name)
-        setDescription(categoria.description || "")
-        setColor(categoria.color)
+        setName(categoria.name);
+        setDescription(categoria.description || "");
+        setColor(categoria.color || CORES_PREDEFINIDAS[0]);
       } else {
-        setName("")
-        setDescription("")
-        setColor(CORES_PREDEFINIDAS[Math.floor(Math.random() * CORES_PREDEFINIDAS.length)])
+        setName("");
+        setDescription("");
+        setColor(CORES_PREDEFINIDAS[Math.floor(Math.random() * CORES_PREDEFINIDAS.length)]);
       }
     }
-  }, [open, categoria])
+  }, [open, categoria]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!name) {
       toast({
         title: "Nome obrigatório",
         description: "Informe um nome para a categoria.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
 
     try {
       const categoriaData = {
         name,
-        description: description || null,
+        description: description || "",
         color,
-      }
+      };
 
       if (categoria) {
-        updateCategory(categoria.id, categoriaData)
+        await updateCategory(categoria.id, categoriaData);
         toast({
           title: "Categoria atualizada",
           description: "A categoria foi atualizada com sucesso.",
-        })
+        });
       } else {
-        addCategory(categoriaData)
+        await addCategory(categoriaData);
         toast({
           title: "Categoria adicionada",
           description: "A categoria foi adicionada com sucesso.",
-        })
+        });
       }
 
-      onOpenChange(false)
+      onOpenChange(false);
     } catch (error) {
       toast({
         title: "Erro",
-        description: categoria ? "Não foi possível atualizar a categoria." : "Não foi possível adicionar a categoria.",
+        description: categoria
+          ? "Não foi possível atualizar a categoria."
+          : "Não foi possível adicionar a categoria.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -210,5 +206,5 @@ export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDial
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
