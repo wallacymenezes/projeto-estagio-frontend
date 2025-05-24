@@ -31,7 +31,6 @@ import { toast } from "@/components/ui/use-toast";
 import { PieChart } from "@/components/charts";
 import type { Expense } from "@/models/Expense";
 import { DailyExpensesChart } from "@/components/DailyExpensesChart";
-import { useAuth } from "@/contexts/auth-context";
 
 export default function DespesasPage() {
   const { Expenses, Categorys, fetchExpenses, fetchCategorys, deleteExpense } =
@@ -45,26 +44,25 @@ export default function DespesasPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDespesa, setSelectedDespesa] = useState<Expense | null>(null);
   const [filteredDespesas, setFilteredDespesas] = useState<Expense[]>([]);
-  const { user } = useAuth();
+  const [hasFetched, setHasFetched] = useState(false);
 
-  const [hasLoadedData, setHasLoadedData] = useState(false);
-
+  // UseEffect para buscar despesas e categorias, mas apenas uma vez
   useEffect(() => {
-    if (user?.token && !hasLoadedData) {
+    if (!hasFetched) {
+      // Chamar fetch apenas uma vez
       const fetchData = async () => {
         try {
           await Promise.all([fetchExpenses(), fetchCategorys()]);
-          console.log("Despesas e categorias carregadas com sucesso.");
-          setHasLoadedData(true);
+          setHasFetched(true); // Marcar que as requisições foram feitas
         } catch (error) {
-          console.error("Erro no fetch:", error);
+          console.error("Erro ao buscar dados:", error);
         }
       };
       fetchData();
     }
-  }, [hasLoadedData, user]);
+  }, [hasFetched, fetchExpenses, fetchCategorys]);
 
-  // Filtrar despesas pelo intervalo de datas
+  // Filtra as despesas de acordo com o intervalo de datas
   useEffect(() => {
     setFilteredDespesas(
       Expenses.filter((despesa) => {
@@ -72,7 +70,7 @@ export default function DespesasPage() {
         return date >= dateRange.from && date <= dateRange.to;
       })
     );
-  }, [Expenses, dateRange]);
+  }, [Expenses, dateRange]); // Isso só será acionado quando a lista de despesas ou o intervalo de datas mudar
 
   const handleEdit = (despesa: Expense) => {
     setSelectedDespesa(despesa);
@@ -201,19 +199,14 @@ export default function DespesasPage() {
     0
   );
 
-  // Preparar dados para o gráfico
   const despesasPorCategoria = filteredDespesas.reduce<Record<string, number>>(
     (acc, despesa) => {
-      // Obtém o id da categoria da despesa
       const categoryId =
         typeof despesa.category === "object" && despesa.category !== null
           ? despesa.category.id
-          : despesa.category; // pode ser id direto
+          : despesa.category;
 
-      // Busca a categoria completa no array Categorys
       const categoria = Categorys.find((cat) => cat.id === categoryId);
-
-      // Usa o nome da categoria ou "Sem categoria" se não encontrar
       const nomeCategoria = categoria?.name || "Sem categoria";
 
       acc[nomeCategoria] = (acc[nomeCategoria] ?? 0) + despesa.value;
@@ -237,12 +230,12 @@ export default function DespesasPage() {
         <h1 className="text-3xl font-bold tracking-tight">Despesas</h1>
         <div className="flex flex-col sm:flex-row gap-4">
           <DateRangePicker
-            date={dateRange} // Aqui passamos o valor de 'dateRange' com as propriedades 'from' e 'to' como obrigatórias
+            date={dateRange}
             onDateChange={(date) => {
               if (date.from && date.to) {
                 setDateRange({ from: date.from, to: date.to });
               }
-            }} // Função para atualizar 'dateRange'
+            }}
           />
           <Button
             onClick={() => {
