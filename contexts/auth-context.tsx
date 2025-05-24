@@ -12,7 +12,6 @@ import { User } from "@/models/User";
 import { LoginRequest } from "@/models/Login";
 import { login, register } from "@/Service/Service";
 import { toast } from "@/hooks/use-toast";
-import { set } from "date-fns";
 
 interface AuthContextType {
   user: User | null;
@@ -29,29 +28,29 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        return JSON.parse(storedUser) as User;
-      } catch {
-        return getEmptyUser();
-      }
-    } else {
-      return getEmptyUser();
-    }
-  });
-
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  //const [isLoading, setIsLoading] = useState(false);
-  const authenticated = !!user?.token;
+  // Só no client side: ler localStorage e atualizar estado user
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        setUser(JSON.parse(storedUser) as User);
+      } else {
+        setUser(getEmptyUser());
+      }
+    } catch {
+      setUser(getEmptyUser());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   async function handleLogin(loginRequest: LoginRequest) {
     setLoading(true);
     try {
-      // Agora response é do tipo User
       const userDTO: User = await login("/auth/login", loginRequest);
 
       if (!userDTO) {
@@ -62,14 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Token não encontrado na resposta.");
       }
 
-      // Remove o prefixo "Bearer " do token, se existir
       const token = userDTO.token.startsWith("Bearer ")
         ? userDTO.token.substring(7)
         : userDTO.token;
 
       const userData: User = {
         ...userDTO,
-        token: token,
+        token,
       };
 
       setUser(userData);
@@ -103,11 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         registrationMethod: "OWN",
       };
 
-      // Aguarda a resposta da API
       const response = await register<User>("/users/register", userToRegister);
 
       if (response && response.token) {
-        // Remove "Bearer " do token, se existir
         const token = response.token.startsWith("Bearer ")
           ? response.token.substring(7)
           : response.token;
@@ -163,7 +159,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }
 
-  // Provide a default value during server-side rendering
   const contextValue: AuthContextType = {
     user,
     loading,
@@ -172,9 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
   };
 
-  // Only render children when mounted on client side
   return (
-    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

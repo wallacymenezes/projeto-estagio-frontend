@@ -30,29 +30,39 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { PieChart } from "@/components/charts";
 import type { Expense } from "@/models/Expense";
+import { DailyExpensesChart } from "@/components/DailyExpensesChart";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function DespesasPage() {
   const { Expenses, Categorys, fetchExpenses, fetchCategorys, deleteExpense } =
     useData();
 
-  // Ajuste no tipo dateRange para garantir que 'from' e 'to' nunca sejam undefined
-  const [dateRange, setDateRange] = useState<{
-    from: Date;
-    to: Date;
-  }>({
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(),
+    to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
   });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDespesa, setSelectedDespesa] = useState<Expense | null>(null);
   const [filteredDespesas, setFilteredDespesas] = useState<Expense[]>([]);
+  const { user } = useAuth();
 
-  // Buscar despesas e categorias ao montar o componente
+  const [hasLoadedData, setHasLoadedData] = useState(false);
+
   useEffect(() => {
-    fetchExpenses();
-    fetchCategorys();
-  }, [fetchExpenses, fetchCategorys]);
+    if (user?.token && !hasLoadedData) {
+      const fetchData = async () => {
+        try {
+          await Promise.all([fetchExpenses(), fetchCategorys()]);
+          console.log("Despesas e categorias carregadas com sucesso.");
+          setHasLoadedData(true);
+        } catch (error) {
+          console.error("Erro no fetch:", error);
+        }
+      };
+      fetchData();
+    }
+  }, [hasLoadedData, user]);
 
   // Filtrar despesas pelo intervalo de datas
   useEffect(() => {
@@ -94,7 +104,7 @@ export default function DespesasPage() {
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Descrição
+          Nome
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
@@ -194,8 +204,28 @@ export default function DespesasPage() {
   // Preparar dados para o gráfico
   const despesasPorCategoria = filteredDespesas.reduce<Record<string, number>>(
     (acc, despesa) => {
-      const categoria = despesa.category?.name || "Sem categoria";
-      acc[categoria] = (acc[categoria] ?? 0) + despesa.value;
+      // Obtém o id da categoria da despesa
+      const categoryId =
+        typeof despesa.category === "object" && despesa.category !== null
+          ? despesa.category.id
+          : despesa.category; // pode ser id direto
+
+      // Busca a categoria completa no array Categorys
+      const categoria = Categorys.find((cat) => cat.id === categoryId);
+
+      // Usa o nome da categoria ou "Sem categoria" se não encontrar
+      const nomeCategoria = categoria?.name || "Sem categoria";
+
+      acc[nomeCategoria] = (acc[nomeCategoria] ?? 0) + despesa.value;
+      return acc;
+    },
+    {}
+  );
+
+  const despesasPorDia = filteredDespesas.reduce<Record<string, number>>(
+    (acc, despesa) => {
+      const dia = new Date(despesa.creationDate).toLocaleDateString("pt-BR");
+      acc[dia] = (acc[dia] ?? 0) + despesa.value;
       return acc;
     },
     {}
@@ -261,6 +291,9 @@ export default function DespesasPage() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+            <div>
+              <DailyExpensesChart />
             </div>
           </CardContent>
         </Card>

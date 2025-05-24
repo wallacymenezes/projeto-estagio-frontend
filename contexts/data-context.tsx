@@ -96,7 +96,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       setEarnings([]);
     }
-  }, [token]);
+  }, [token, userId]);
 
   const addEarning = async (earning: Omit<Earning, "id" | "creationDate">) => {
     try {
@@ -236,7 +236,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       setInvestments([]);
     }
-  }, [token]);
+  }, [token, userId]);
 
   const addInvestment = async (
     investment: Omit<Investment, "id" | "creationDate">
@@ -260,7 +260,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     investment: Partial<Omit<Investment, "id" | "creationDate">>
   ) => {
     try {
-      const updated = await atualizar(`/investments/${id}`, { ...investment, id, userId }, token);
+      const updated = await atualizar(`/investments`, { ...investment, id, userId }, token);
       setInvestments((prev) => prev.map((i) => (i.id === id ? updated : i)));
       return updated;
     } catch (error: any) {
@@ -300,7 +300,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       setObjectives([]);
     }
-  }, [token]);
+  }, [token, userId]);
 
   const addObjective = async (
     objective: Omit<Objective, "id" | "creationDate">
@@ -364,7 +364,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       setCategorys([]);
     }
-  }, [token]);
+  }, [token, userId]);
 
   const addCategory = async (category: Omit<Category, "id">) => {
     try {

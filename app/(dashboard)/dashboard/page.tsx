@@ -38,7 +38,7 @@ export default function DashboardPage() {
 
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(),
+    to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
   });
 
   const [comparisons, setComparisons] = useState({
@@ -78,14 +78,39 @@ export default function DashboardPage() {
     }
   }, [fetchEarnings, fetchExpenses, fetchInvestments, fetchObjectives]);
 
-  // Filtrar dados pelo intervalo de datas
-  const filteredEarnings = Earnings.filter((earning) => {
-    const date = new Date(earning.creationDate);
-    return date >= dateRange.from && date <= dateRange.to;
-  });
+  const { fetchCategorys, Categorys } = useData();
+
+  useEffect(() => {
+    fetchCategorys();
+  }, [fetchCategorys]);
 
   const filteredExpenses = Expenses.filter((expense) => {
     const date = new Date(expense.creationDate);
+    return date >= dateRange.from && date <= dateRange.to;
+  });
+
+  const getCategoryName = (categoryId: number | string | undefined) => {
+    if (!categoryId) return "Sem categoria";
+    const cat = Categorys.find((c) => c.id === categoryId);
+    return cat?.name ?? "Sem categoria";
+  };
+
+  const expensesByCategory = filteredExpenses.reduce<Record<string, number>>(
+    (acc, expense) => {
+      const categoryId =
+        typeof expense.category === "object"
+          ? expense.category.id
+          : expense.category;
+      const categoryName = getCategoryName(categoryId);
+      acc[categoryName] = (acc[categoryName] ?? 0) + expense.value;
+      return acc;
+    },
+    {}
+  );
+
+  // Filtrar dados pelo intervalo de datas
+  const filteredEarnings = Earnings.filter((earning) => {
+    const date = new Date(earning.creationDate);
     return date >= dateRange.from && date <= dateRange.to;
   });
 
@@ -172,15 +197,6 @@ export default function DashboardPage() {
   ]);
 
   // Dados para gráficos
-  const expensesByCategory = filteredExpenses.reduce<Record<string, number>>(
-    (acc, expense) => {
-      const category = expense.category?.toString() || "Sem categoria";
-      acc[category] = (acc[category] ?? 0) + expense.value;
-      return acc;
-    },
-    {}
-  );
-
   const expensesByDay = filteredExpenses.reduce<Record<string, number>>(
     (acc, expense) => {
       const day = new Date(expense.creationDate).toLocaleDateString("pt-BR");
@@ -361,16 +377,20 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Objetivos Cadastrados
+                Saldo em Conta
               </CardTitle>
-              <div className="rounded-full p-2 bg-purple-100 dark:bg-purple-900">
-                <TargetIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900">
+                <BanknoteIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{Objectives.length}</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(
+                  totalEarnings - (totalExpenses + totalInvestments)
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Total: {formatCurrency(totalObjectives)}
+                Valor restante dos ganhos
               </p>
             </CardContent>
           </Card>

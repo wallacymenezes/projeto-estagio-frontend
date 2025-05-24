@@ -1,15 +1,21 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useData } from "@/contexts/data-context"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DateRangePicker } from "@/components/date-range-picker"
-import { DataTable } from "@/components/data-table"
-import { GanhoDialog } from "@/components/ganho-dialog"
-import { formatCurrency } from "@/lib/utils"
-import type { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useData } from "@/contexts/data-context";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { DateRangePicker } from "@/components/date-range-picker";
+import { DataTable } from "@/components/data-table";
+import { GanhoDialog } from "@/components/ganho-dialog";
+import { formatCurrency } from "@/lib/utils";
+import type { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,71 +26,71 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { toast } from "@/components/ui/use-toast"
-import type { Earning } from "@/models/Earning" // Importa o tipo correto do modelo
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/components/ui/use-toast";
+import type { Earning } from "@/models/Earning"; // Importa o tipo correto do modelo
 
 export default function GanhosPage() {
   // Usar nomes e tipos do contexto correto:
-  const { Earnings, fetchEarnings, deleteEarning } = useData()
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedGanho, setSelectedGanho] = useState<Earning | null>(null) // Ajuste do tipo para Earning
-  const [filteredGanhos, setFilteredGanhos] = useState<Earning[]>([])
-  const [dateRange, setDateRange] = useState<{
-    from: Date
-    to: Date
-  }>({
+  const { Earnings, fetchEarnings, deleteEarning } = useData();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedGanho, setSelectedGanho] = useState<Earning | null>(null); // Ajuste do tipo para Earning
+  const [filteredGanhos, setFilteredGanhos] = useState<Earning[]>([]);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(),
-  })
+    to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
+  });
 
   useEffect(() => {
-    fetchEarnings()
-  }, [fetchEarnings])
+    fetchEarnings();
+  }, [fetchEarnings]);
 
   useEffect(() => {
     setFilteredGanhos(
       Earnings.filter((ganho) => {
-        const date = new Date(ganho.creationDate)
-        return date >= dateRange.from && date <= dateRange.to
-      }),
-    )
-  }, [Earnings, dateRange])
+        const date = new Date(ganho.creationDate);
+        return date >= dateRange.from && date <= dateRange.to;
+      })
+    );
+  }, [Earnings, dateRange]);
 
   // Função intermediária para corrigir problema do DateRangePicker
   function handleDateChange(range: { from?: Date; to?: Date }) {
     if (range.from && range.to) {
-      setDateRange({ from: range.from, to: range.to })
+      setDateRange({ from: range.from, to: range.to });
     }
   }
 
   const handleEdit = (ganho: Earning) => {
-    setSelectedGanho(ganho)
-    setIsDialogOpen(true)
-  }
+    setSelectedGanho(ganho);
+    setIsDialogOpen(true);
+  };
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteEarning(id)
+      await deleteEarning(id);
       toast({
         title: "Ganho excluído",
         description: "O ganho foi excluído com sucesso.",
-      })
+      });
     } catch (error) {
       toast({
         title: "Erro ao excluir",
         description: "Não foi possível excluir o ganho.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const columns: ColumnDef<Earning>[] = [
     {
       accessorKey: "name",
       header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Descrição
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Nome
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
@@ -93,7 +99,10 @@ export default function GanhosPage() {
     {
       accessorKey: "value",
       header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
           Valor
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
@@ -103,12 +112,16 @@ export default function GanhosPage() {
     {
       accessorKey: "creationDate",
       header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
           Data
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => new Date(row.getValue("creationDate")).toLocaleDateString("pt-BR"),
+      cell: ({ row }) =>
+        new Date(row.getValue("creationDate")).toLocaleDateString("pt-BR"),
     },
     {
       accessorKey: "wage",
@@ -118,11 +131,15 @@ export default function GanhosPage() {
     {
       id: "actions",
       cell: ({ row }) => {
-        const ganho = row.original
+        const ganho = row.original;
 
         return (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => handleEdit(ganho)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEdit(ganho)}
+            >
               <Edit className="h-4 w-4" />
               <span className="sr-only">Editar</span>
             </Button>
@@ -137,7 +154,8 @@ export default function GanhosPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Tem certeza que deseja excluir este ganho? Esta ação não pode ser desfeita.
+                    Tem certeza que deseja excluir este ganho? Esta ação não
+                    pode ser desfeita.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -152,12 +170,15 @@ export default function GanhosPage() {
               </AlertDialogContent>
             </AlertDialog>
           </div>
-        )
+        );
       },
     },
-  ]
+  ];
 
-  const totalGanhos = filteredGanhos.reduce((acc, ganho) => acc + ganho.value, 0)
+  const totalGanhos = filteredGanhos.reduce(
+    (acc, ganho) => acc + ganho.value,
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -167,8 +188,8 @@ export default function GanhosPage() {
           <DateRangePicker date={dateRange} onDateChange={handleDateChange} />
           <Button
             onClick={() => {
-              setSelectedGanho(null)
-              setIsDialogOpen(true)
+              setSelectedGanho(null);
+              setIsDialogOpen(true);
             }}
             className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
           >
@@ -181,13 +202,17 @@ export default function GanhosPage() {
       <Card>
         <CardHeader>
           <CardTitle>Resumo</CardTitle>
-          <CardDescription>Visão geral dos seus ganhos no período selecionado</CardDescription>
+          <CardDescription>
+            Visão geral dos seus ganhos no período selecionado
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total de Ganhos</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Total de Ganhos
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
@@ -197,10 +222,14 @@ export default function GanhosPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Quantidade de Registros</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Quantidade de Registros
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{filteredGanhos.length}</div>
+                <div className="text-2xl font-bold">
+                  {filteredGanhos.length}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -222,7 +251,11 @@ export default function GanhosPage() {
         </CardContent>
       </Card>
 
-      <GanhoDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} ganho={selectedGanho} />
+      <GanhoDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        ganho={selectedGanho}
+      />
     </div>
-  )
+  );
 }
