@@ -1,38 +1,69 @@
+// components/DailyExpensesChart.tsx
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { CartesianGrid, LabelList, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  CartesianGrid,
+  LabelList,
+  Line,
+  LineChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import { useData } from "@/contexts/data-context";
 import { formatCurrency } from "@/lib/utils";
 
 export function DailyExpensesChart() {
-  const { Expenses, fetchExpenses } = useData();
+  // Removido fetchExpenses daqui, pois a página pai (DespesasPage) já deve ter buscado.
+  const { Expenses } = useData();
 
-  const [chartData, setChartData] = useState<{ date: string; value: number }[]>([]);
+  const [chartData, setChartData] = useState<{ date: string; value: number }[]>(
+    []
+  );
 
   useEffect(() => {
-    fetchExpenses();
+    // Não chamar fetchExpenses() aqui.
+    if (Expenses && Expenses.length > 0) {
+      const grouped = Expenses.reduce<Record<string, number>>(
+        (acc, expense) => {
+          const day = new Date(expense.creationDate).toLocaleDateString(
+            "pt-BR",
+            { timeZone: "UTC" }
+          );
+          acc[day] = (acc[day] ?? 0) + expense.value;
+          return acc;
+        },
+        {}
+      );
 
-    // Agrupar despesas por dia
-    const grouped = Expenses.reduce<Record<string, number>>((acc, expense) => {
-      const day = new Date(expense.creationDate).toLocaleDateString("pt-BR");
-      acc[day] = (acc[day] ?? 0) + expense.value;
-      return acc;
-    }, {});
-
-    // Converter para array ordenado por data
-    const dataArr = Object.entries(grouped)
-      .map(([date, value]) => ({ date, value }))
-      .sort((a, b) => {
-        const dateA = new Date(a.date.split('/').reverse().join('-')); // converte dd/mm/yyyy para yyyy-mm-dd
-        const dateB = new Date(b.date.split('/').reverse().join('-'));
-        return dateA.getTime() - dateB.getTime();
-      });
-
-    setChartData(dataArr);
-  }, [Expenses, fetchExpenses]);
+      const dataArr = Object.entries(grouped)
+        .map(([date, value]) => ({ date, value }))
+        .sort((a, b) => {
+          const [dayA, monthA, yearA] = a.date.split("/").map(Number);
+          const [dayB, monthB, yearB] = b.date.split("/").map(Number);
+          const dateA = new Date(yearA, monthA - 1, dayA);
+          const dateB = new Date(yearB, monthB - 1, dayB);
+          return dateA.getTime() - dateB.getTime();
+        });
+      setChartData(dataArr);
+    } else {
+      setChartData([]);
+    }
+  }, [Expenses]); // Depender apenas de Expenses para recalcular o gráfico.
 
   const chartConfig = {
     value: {

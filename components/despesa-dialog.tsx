@@ -1,3 +1,4 @@
+// wallacymenezes/projeto-estagio-frontend/projeto-estagio-frontend-d0eaefe2ab734cdf8502a055fd12d3c722944237/components/despesa-dialog.tsx
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -17,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
-import type { Expense } from "@/models/Expense"
+import type { Expense, ExpenseStatus } from "@/models/Expense" // Importar ExpenseStatus
 import type { Category } from "@/models/Category"
 
 interface DespesaDialogProps {
@@ -36,6 +37,7 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
   const [description, setDescription] = useState("")
   const [value, setValue] = useState("")
   const [category, setCategory] = useState<Category | null>(null)
+  const [status, setStatus] = useState<ExpenseStatus>("PENDING") // Novo estado para status
 
   useEffect(() => {
     if (open) {
@@ -43,12 +45,14 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
         setName(despesa.name)
         setDescription(despesa.description ?? "")
         setValue(despesa.value.toString())
-        setCategory(despesa.category)
+        setCategory(despesa.category) // Assumindo que despesa.category é um objeto Category
+        setStatus(despesa.status || "PENDING") // Definir status, com fallback para PENDENTE
       } else {
         setName("")
         setDescription("")
         setValue("")
         setCategory(null)
+        setStatus("PENDING") // Status padrão para nova despesa
       }
     }
   }, [open, despesa])
@@ -59,7 +63,7 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
     if (!name || !value || isNaN(Number(value)) || Number(value) <= 0) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha todos os campos obrigatórios com valores válidos.",
+        description: "Preencha nome e valor com dados válidos.",
         variant: "destructive",
       })
       return
@@ -77,22 +81,34 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
     setLoading(true)
 
     try {
-      const despesaData: Omit<Expense, "id" | "creationDate"> = {
+      // O tipo aqui deve corresponder ao que addExpense/updateExpense esperam.
+      // Se category é um objeto no formulário, mas a API espera um ID, ajuste aqui.
+      const despesaData = {
         name,
         description,
         value: Number.parseFloat(value),
-        category,
-        userId: despesa?.userId, // opcionalmente mantenha userId se existir
-      }
+        category: category, // Enviar o objeto Category ou apenas o ID, conforme esperado pelo backend/DataContext
+        userId: despesa?.userId,
+        status, // Adicionar status
+      };
 
       if (despesa) {
-        await updateExpense(despesa.id, despesaData)
+        // O tipo para updateExpense no DataContext é Partial<Omit<Expense, "id" | "creationDate" | "category">> & { category?: number | Category, status?: ExpenseStatus }
+        // Ajuste o payload conforme necessário, especialmente para `category`
+        await updateExpense(despesa.id, {
+            ...despesaData,
+            category: category.id, // Enviando o ID da categoria para o backend
+        });
         toast({
           title: "Despesa atualizada",
           description: "A despesa foi atualizada com sucesso.",
         })
       } else {
-        await addExpense(despesaData)
+        // O tipo para addExpense no DataContext é Omit<Expense, "id" | "creationDate" | "category"> & { category: number | Category, status: ExpenseStatus }
+        await addExpense({
+            ...despesaData,
+            category: category.id, // Enviando o ID da categoria para o backend
+        });
         toast({
           title: "Despesa adicionada",
           description: "A despesa foi adicionada com sucesso.",
@@ -100,7 +116,8 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
       }
 
       onOpenChange(false)
-    } catch {
+    } catch (error) {
+      console.error("Erro ao salvar despesa:", error);
       toast({
         title: "Erro",
         description: despesa
@@ -163,26 +180,40 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
             <div className="grid gap-2">
               <Label htmlFor="category">Categoria</Label>
               <Select
-                value={category?.id.toString() ?? "none"}
+                value={category?.id?.toString() ?? ""}
                 onValueChange={(val) => {
-                  if (val === "none") {
-                    setCategory(null)
-                  } else {
-                    const cat = categorias.find(c => c.id === parseInt(val))
-                    setCategory(cat ?? null)
-                  }
+                  const selectedCat = categorias.find(c => c.id.toString() === val);
+                  setCategory(selectedCat ?? null);
                 }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sem categoria</SelectItem>
-                  {categorias.map((categoria) => (
-                    <SelectItem key={categoria.id} value={categoria.id.toString()}>
-                      {categoria.name}
+                  {categorias.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id.toString()}>
+                      {cat.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Novo campo para Status */}
+            <div className="grid gap-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={status}
+                onValueChange={(val: string) => setStatus(val as ExpenseStatus)}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PENDING">Pendente</SelectItem>
+                  <SelectItem value="PAID">Pago</SelectItem>
+                  <SelectItem value="OVERDUE">Atrasado</SelectItem>
                 </SelectContent>
               </Select>
             </div>

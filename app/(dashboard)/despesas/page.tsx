@@ -1,6 +1,7 @@
+// wallacymenezes/projeto-estagio-frontend/projeto-estagio-frontend-d0eaefe2ab734cdf8502a055fd12d3c722944237/app/(dashboard)/despesas/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +16,7 @@ import { DataTable } from "@/components/data-table";
 import { DespesaDialog } from "@/components/despesa-dialog";
 import { formatCurrency } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react";
+import { ArrowUpDown, Edit, Plus, Trash, WalletIcon, TrendingUpIcon, CoinsIcon, ArrowUpIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,12 +30,24 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import { PieChart } from "@/components/charts";
-import type { Expense } from "@/models/Expense";
+import { Badge } from "@/components/ui/badge";
+import type { Expense, ExpenseStatus } from "@/models/Expense";
 import { DailyExpensesChart } from "@/components/DailyExpensesChart";
+import type { Earning } from "@/models/Earning";
+import type { Investment } from "@/models/Investment";
 
 export default function DespesasPage() {
-  const { Expenses, Categorys, fetchExpenses, fetchCategorys, deleteExpense } =
-    useData();
+  const {
+    Expenses,
+    Categorys,
+    Earnings,
+    Investments,
+    fetchExpenses,
+    fetchCategorys,
+    fetchEarnings,
+    fetchInvestments,
+    deleteExpense,
+  } = useData();
 
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -43,34 +56,45 @@ export default function DespesasPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDespesa, setSelectedDespesa] = useState<Expense | null>(null);
-  const [filteredDespesas, setFilteredDespesas] = useState<Expense[]>([]);
-  const [hasFetched, setHasFetched] = useState(false);
 
-  // UseEffect para buscar despesas e categorias, mas apenas uma vez
-  useEffect(() => {
-    if (!hasFetched) {
-      // Chamar fetch apenas uma vez
-      const fetchData = async () => {
-        try {
-          await Promise.all([fetchExpenses(), fetchCategorys()]);
-          setHasFetched(true); // Marcar que as requisições foram feitas
-        } catch (error) {
-          console.error("Erro ao buscar dados:", error);
-        }
-      };
-      fetchData();
-    }
-  }, [hasFetched, fetchExpenses, fetchCategorys]);
+  const filteredExpenses = useMemo(() =>
+    Expenses.filter((despesa) => {
+      if (!despesa || !despesa.creationDate) return false; // Verificação adicional
+      const date = new Date(despesa.creationDate);
+      return date >= dateRange.from && date <= dateRange.to;
+    }), [Expenses, dateRange]);
 
-  // Filtra as despesas de acordo com o intervalo de datas
+  const filteredEarnings = useMemo(() =>
+    Earnings.filter((earning) => {
+      if (!earning || !earning.creationDate) return false;
+      const date = new Date(earning.creationDate);
+      return date >= dateRange.from && date <= dateRange.to;
+    }), [Earnings, dateRange]);
+
+  const filteredInvestments = useMemo(() =>
+    Investments.filter((investment) => {
+      if (!investment || !investment.creation_date) return false;
+      const date = new Date(investment.creation_date);
+      return date >= dateRange.from && date <= dateRange.to;
+    }), [Investments, dateRange]);
+
+
   useEffect(() => {
-    setFilteredDespesas(
-      Expenses.filter((despesa) => {
-        const date = new Date(despesa.creationDate);
-        return date >= dateRange.from && date <= dateRange.to;
-      })
-    );
-  }, [Expenses, dateRange]); // Isso só será acionado quando a lista de despesas ou o intervalo de datas mudar
+    const loadInitialData = async () => {
+      try {
+        await Promise.all([
+          fetchExpenses(),
+          fetchCategorys(),
+          fetchEarnings(),
+          fetchInvestments(),
+        ]);
+      } catch (error) {
+        console.error("DespesasPage: Erro ao buscar dados iniciais", error);
+      }
+    };
+    loadInitialData();
+  }, [fetchExpenses, fetchCategorys, fetchEarnings, fetchInvestments]);
+
 
   const handleEdit = (despesa: Expense) => {
     setSelectedDespesa(despesa);
@@ -93,7 +117,6 @@ export default function DespesasPage() {
     }
   };
 
-  // Colunas para DataTable
   const columns: ColumnDef<Expense>[] = [
     {
       accessorKey: "name",
@@ -108,7 +131,9 @@ export default function DespesasPage() {
       ),
     },
     {
-      accessorKey: "category.name",
+      // accessorKey: "category.name", // Usar uma função accessor para segurança
+      accessorFn: row => row.category?.name, // Função accessor para obter o nome da categoria
+      id: "categoryName", // ID único para a coluna
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -118,7 +143,10 @@ export default function DespesasPage() {
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => row.original.category?.name || "Sem categoria",
+      cell: ({ row }) => {
+        const category = row.original.category; // Acessa o objeto category diretamente
+        return category?.name || "Sem categoria"; // Exibe o nome ou "Sem categoria"
+      }
     },
     {
       accessorKey: "value",
@@ -148,10 +176,47 @@ export default function DespesasPage() {
         new Date(row.getValue("creationDate")).toLocaleDateString("pt-BR"),
     },
     {
+      accessorKey: "status",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Status
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const status = row.original.status; // Acessar diretamente de row.original
+        let statusText = "Desconhecido";
+        let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "outline";
+        let customStyle: React.CSSProperties = {};
+
+        switch (status) {
+          case "PAID":
+            statusText = "Pago";
+            badgeVariant = "secondary";
+            customStyle = { backgroundColor: 'hsl(var(--chart-2))', color: 'hsl(var(--primary-foreground))', borderColor: 'hsl(var(--chart-2))' };
+            break;
+          case "PENDING":
+            statusText = "Pendente";
+            badgeVariant = "default";
+            customStyle = { backgroundColor: 'hsl(var(--chart-4))', color: 'hsl(var(--primary-foreground))', borderColor: 'hsl(var(--chart-4))' };
+            break;
+          case "OVERDUE":
+            statusText = "Atrasado";
+            badgeVariant = "destructive";
+            break;
+          default:
+             statusText = status ? String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase() : "Desconhecido";
+        }
+        return <Badge variant={badgeVariant} style={badgeVariant !== 'destructive' ? customStyle : {}}>{statusText}</Badge>;
+      },
+    },
+    {
       id: "actions",
       cell: ({ row }) => {
         const despesa = row.original;
-
         return (
           <div className="flex items-center gap-2">
             <Button
@@ -194,45 +259,36 @@ export default function DespesasPage() {
     },
   ];
 
-  const totalDespesas = filteredDespesas.reduce(
-    (acc, despesa) => acc + despesa.value,
-    0
-  );
+  const totalGanhosPeriodo = useMemo(() =>
+    filteredEarnings.reduce((acc, earning) => acc + earning.value, 0), [filteredEarnings]);
 
-  const despesasPorCategoria = filteredDespesas.reduce<Record<string, number>>(
-    (acc, despesa) => {
-      const categoryId =
-        typeof despesa.category === "object" && despesa.category !== null
-          ? despesa.category.id
-          : despesa.category;
+  const totalDespesasPagasPeriodo = useMemo(() =>
+    filteredExpenses
+      .filter(expense => expense.status === "PAID")
+      .reduce((acc, expense) => acc + expense.value, 0), [filteredExpenses]);
 
-      const categoria = Categorys.find((cat) => cat.id === categoryId);
-      const nomeCategoria = categoria?.name || "Sem categoria";
+  const totalTodasDespesasPeriodo = useMemo(() =>
+    filteredExpenses.reduce((acc, expense) => acc + expense.value, 0), [filteredExpenses]);
 
-      acc[nomeCategoria] = (acc[nomeCategoria] ?? 0) + despesa.value;
-      return acc;
-    },
-    {}
-  );
+  const totalInvestidoPeriodo = useMemo(() =>
+    filteredInvestments.reduce((acc, investment) => acc + investment.value, 0), [filteredInvestments]);
 
-  const despesasPorDia = filteredDespesas.reduce<Record<string, number>>(
-    (acc, despesa) => {
-      const dia = new Date(despesa.creationDate).toLocaleDateString("pt-BR");
-      acc[dia] = (acc[dia] ?? 0) + despesa.value;
-      return acc;
-    },
-    {}
-  );
+  const saldoEmConta = useMemo(() =>
+    totalGanhosPeriodo - totalDespesasPagasPeriodo - totalInvestidoPeriodo, [totalGanhosPeriodo, totalDespesasPagasPeriodo, totalInvestidoPeriodo]);
+
+  const saldoASobrar = useMemo(() =>
+    totalGanhosPeriodo - totalTodasDespesasPeriodo - totalInvestidoPeriodo, [totalGanhosPeriodo, totalTodasDespesasPeriodo, totalInvestidoPeriodo]);
+
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Despesas</h1>
         <div className="flex flex-col sm:flex-row gap-4">
           <DateRangePicker
             date={dateRange}
             onDateChange={(date) => {
-              if (date.from && date.to) {
+              if (date?.from && date?.to) {
                 setDateRange({ from: date.from, to: date.to });
               }
             }}
@@ -250,63 +306,72 @@ export default function DespesasPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumo</CardTitle>
-            <CardDescription>
-              Visão geral das suas despesas no período selecionado
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="pb-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>Resumo do Período</CardTitle>
+          <CardDescription>
+            Visão geral das suas finanças no período selecionado
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-medium">Total de Despesas</CardTitle>
+                <CoinsIcon className="h-5 w-5 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {formatCurrency(totalTodasDespesasPeriodo)}
+                </div>
+                 <p className="text-xs text-muted-foreground">
+                  {filteredExpenses.length} registro(s)
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-medium">Saldo em Conta</CardTitle>
+                <WalletIcon className="h-5 w-5 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${saldoEmConta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {formatCurrency(saldoEmConta)}
+                </div>
+                <p className="text-xs text-muted-foreground">Ganhos - Despesas Pagas - Investimentos</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-medium">Saldo a Sobrar</CardTitle>
+                <TrendingUpIcon className="h-5 w-5 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${saldoASobrar >=0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                  {formatCurrency(saldoASobrar)}
+                </div>
+                <p className="text-xs text-muted-foreground">Ganhos - Todas Despesas - Investimentos</p>
+              </CardContent>
+            </Card>
+             <Card>
+                <CardHeader className="pb-2 flex flex-row items-center justify-between">
                   <CardTitle className="text-sm font-medium">
-                    Total de Despesas
+                    Total de Ganhos
                   </CardTitle>
+                   <ArrowUpIcon className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    {formatCurrency(totalDespesas)}
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {formatCurrency(totalGanhosPeriodo)}
                   </div>
+                   <p className="text-xs text-muted-foreground">
+                    {filteredEarnings.length} registro(s) no período
+                  </p>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Quantidade de Registros
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {filteredDespesas.length}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            <div>
-              <DailyExpensesChart />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Despesas por Categoria</CardTitle>
-            <CardDescription>
-              Distribuição das suas despesas por categoria
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            <PieChart
-              data={Object.entries(despesasPorCategoria).map(
-                ([name, value]) => ({ name, value })
-              )}
-            />
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -316,9 +381,9 @@ export default function DespesasPage() {
         <CardContent>
           <DataTable
             columns={columns}
-            data={filteredDespesas}
+            data={filteredExpenses}
             searchColumn="name"
-            searchPlaceholder="Filtrar por descrição..."
+            searchPlaceholder="Filtrar por nome..."
           />
         </CardContent>
       </Card>

@@ -6,9 +6,10 @@ import {
   useContext,
   useState,
   type ReactNode,
+  useMemo,
 } from "react";
 import { Earning } from "@/models/Earning";
-import { Expense } from "@/models/Expense";
+import { Expense, ExpenseStatus } from "@/models/Expense";
 import { Investment } from "@/models/Investment";
 import { Objective } from "@/models/Objective";
 import { Category } from "@/models/Category";
@@ -33,11 +34,12 @@ interface DataContextType {
   deleteEarning: (id: number) => Promise<void>;
 
   fetchExpenses: () => Promise<void>;
-  addExpense: (Expense: Omit<Expense, "id" | "creationDate">) => Promise<any>;
+  // Espera o objeto Category completo e status
+  addExpense: (expense: Omit<Expense, "id" | "creationDate" | "category" | "userId"> & { category: number, status: ExpenseStatus }) => Promise<Expense | undefined>;
   updateExpense: (
     id: number,
-    Expense: Partial<Omit<Expense, "id" | "creationDate">>
-  ) => Promise<any>;
+    expense: Partial<Omit<Expense, "id" | "creationDate" | "category" | "userId">> & { category?: number, status?: ExpenseStatus }
+  ) => Promise<Expense | undefined>;
   deleteExpense: (id: number) => Promise<void>;
 
   fetchInvestments: () => Promise<void>;
@@ -72,10 +74,9 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-
-  const { user } = useAuth();
-  const token = user?.token || "";
-  const userId = user?.userId || "";
+  const { user, loading: authLoading } = useAuth();
+  const token = useMemo(() => user?.token || "", [user?.token]);
+  const userId = useMemo(() => user?.userId || "", [user?.userId]);
 
   const [Earnings, setEarnings] = useState<Earning[]>([]);
   const [Expenses, setExpenses] = useState<Expense[]>([]);
@@ -85,18 +86,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Earnings
   const fetchEarnings = useCallback(async () => {
+    if (authLoading || !token || !userId) return;
     try {
       const data = await buscar(`/earnings/user/${userId}`, token);
       setEarnings(data);
     } catch (error: any) {
       toast({
-        title: "Erro ao buscar Earnings",
-        description: error.message || "Erro durante a operação.",
+        title: "Erro ao buscar Ganhos",
+        description: error.message || "Erro.",
         variant: "destructive",
       });
       setEarnings([]);
     }
-  }, [token, userId]);
+  }, [token, userId, authLoading]);
 
   const addEarning = async (earning: Omit<Earning, "id" | "creationDate">) => {
     try {
@@ -155,35 +157,49 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Expenses
   const fetchExpenses = useCallback(async () => {
+    if (authLoading || !token || !userId) {
+      // Verificar authLoading, token e userId
+      return;
+    }
     try {
       const data = await buscar(`/expenses/user/${userId}`, token);
       setExpenses(data);
     } catch (error: any) {
       toast({
-        title: "Erro ao buscar Expenses",
+        title: "Erro ao buscar Despesas",
         description: error.message || "Erro durante a operação.",
         variant: "destructive",
       });
-      setExpenses([]);
+      setExpenses([]); // Definir como array vazio em caso de erro
     }
-  }, [token]);
+  }, [token, userId, authLoading]);
 
-  const addExpense = async (expense: Omit<Expense, "id" | "creationDate">) => {
+  const addExpense = async (expense: Omit<Expense, "id" | "creationDate" | "category" | "userId"> & { category: number, status: ExpenseStatus }): Promise<Expense | undefined> => {
     try {
       const expensePayload = {
-        ...expense,
+        ...expense, // Contém name, description, value, status
         userId,
-        category: typeof expense.category === 'object' && expense.category?.id 
-          ? expense.category.id 
-          : expense.category
+        category: expense.category, // Já deve ser o ID da categoria
       };
 
-      const newExpense = await register("/expenses", expensePayload, token);
-      setExpenses((prev) => [...prev, newExpense]);
-      return newExpense;
+      const newExpenseResponse = await register("/expenses", expensePayload, token);
+
+      // Para atualizar o estado local corretamente, buscamos a categoria completa
+      const categoryDetails = Categorys.find(cat => cat.id === expense.category);
+
+      if (newExpenseResponse && categoryDetails) {
+        const newExpenseWithCategory: Expense = {
+          ...newExpenseResponse, // Resposta do backend (pode já ter a categoria completa)
+          category: categoryDetails, // Garante que temos o objeto Category
+          status: expense.status, // Garante que o status está correto no estado local
+        };
+        setExpenses((prev) => [...prev, newExpenseWithCategory]);
+        return newExpenseWithCategory;
+      }
+      return newExpenseResponse; // Retorna a resposta do backend mesmo se a categoria não for encontrada localmente
     } catch (error: any) {
       toast({
-        title: "Erro ao adicionar Expense",
+        title: "Erro ao adicionar Despesa",
         description: error.message || "Erro durante a operação.",
         variant: "destructive",
       });
@@ -193,15 +209,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateExpense = async (
     id: number,
-    expense: Partial<Omit<Expense, "id" | "creationDate">>
-  ) => {
+    expense: Partial<Omit<Expense, "id" | "creationDate" | "category" | "userId">> & { category?: number, status?: ExpenseStatus }
+  ): Promise<Expense | undefined> => {
     try {
-      const updated = await atualizar(`/expenses/${id}`, { ...expense, id, userId }, token);
-      setExpenses((prev) => prev.map((e) => (e.id === id ? updated : e)));
-      return updated;
+      const expensePayload: any = { ...expense, id, userId };
+      if (expense.category) {
+        expensePayload.category = expense.category; // Já deve ser o ID
+      }
+
+      const updatedExpenseResponse = await atualizar(`/expenses/${id}`, expensePayload, token);
+
+      // Para atualizar o estado local corretamente
+      const categoryDetails = expense.category ? Categorys.find(cat => cat.id === expense.category) : undefined;
+
+      if (updatedExpenseResponse) {
+         const updatedExpenseWithCategory: Expense = {
+            ...updatedExpenseResponse,
+            // Se a categoria foi atualizada, use os detalhes dela. Senão, mantenha a existente.
+            category: categoryDetails || Expenses.find(exp => exp.id === id)?.category!,
+            status: expense.status || Expenses.find(exp => exp.id === id)?.status!,
+         };
+        setExpenses((prev) => prev.map((e) => (e.id === id ? updatedExpenseWithCategory : e)));
+        return updatedExpenseWithCategory;
+      }
+      return updatedExpenseResponse;
     } catch (error: any) {
       toast({
-        title: "Erro ao atualizar Expense",
+        title: "Erro ao atualizar Despesa",
         description: error.message || "Erro durante a operação.",
         variant: "destructive",
       });
@@ -225,24 +259,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Investments
   const fetchInvestments = useCallback(async () => {
+    if (authLoading || !token || !userId) return;
     try {
       const data = await buscar(`/investments/user/${userId}`, token);
       setInvestments(data);
     } catch (error: any) {
       toast({
-        title: "Erro ao buscar Investments",
-        description: error.message || "Erro durante a operação.",
+        title: "Erro ao buscar Investimentos",
+        description: error.message || "Erro.",
         variant: "destructive",
       });
       setInvestments([]);
     }
-  }, [token, userId]);
+  }, [token, userId, authLoading]);
 
   const addInvestment = async (
     investment: Omit<Investment, "id" | "creationDate">
   ) => {
     try {
-      const newInvestment = await register("/investments", { ...investment, userId }, token);
+      const newInvestment = await register(
+        "/investments",
+        { ...investment, userId },
+        token
+      );
       setInvestments((prev) => [...prev, newInvestment]);
       return newInvestment;
     } catch (error: any) {
@@ -260,7 +299,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     investment: Partial<Omit<Investment, "id" | "creationDate">>
   ) => {
     try {
-      const updated = await atualizar(`/investments`, { ...investment, id, userId }, token);
+      const updated = await atualizar(
+        `/investments`,
+        { ...investment, id, userId },
+        token
+      );
       setInvestments((prev) => prev.map((i) => (i.id === id ? updated : i)));
       return updated;
     } catch (error: any) {
@@ -289,24 +332,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Objectives
   const fetchObjectives = useCallback(async () => {
+    if (authLoading || !token || !userId) return;
     try {
       const data = await buscar(`/objectives/user/${userId}`, token);
       setObjectives(data);
     } catch (error: any) {
       toast({
-        title: "Erro ao buscar Objectives",
-        description: error.message || "Erro durante a operação.",
+        title: "Erro ao buscar Objetivos",
+        description: error.message || "Erro.",
         variant: "destructive",
       });
       setObjectives([]);
     }
-  }, [token, userId]);
+  }, [token, userId, authLoading]);
 
   const addObjective = async (
     objective: Omit<Objective, "id" | "creationDate">
   ) => {
     try {
-      const newObjective = await register("/objectives", { ...objective, userId }, token);
+      const newObjective = await register(
+        "/objectives",
+        { ...objective, userId },
+        token
+      );
       setObjectives((prev) => [...prev, newObjective]);
       return newObjective;
     } catch (error: any) {
@@ -324,7 +372,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     objective: Partial<Omit<Objective, "id" | "creationDate">>
   ) => {
     try {
-      const updated = await atualizar(`/objectives/${id}`, { ...objective, id, userId }, token);
+      const updated = await atualizar(
+        `/objectives/${id}`,
+        { ...objective, id, userId },
+        token
+      );
       setObjectives((prev) => prev.map((o) => (o.id === id ? updated : o)));
       return updated;
     } catch (error: any) {
@@ -353,22 +405,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Categorys
   const fetchCategorys = useCallback(async () => {
+    if (authLoading || !token || !userId) {
+      // Verificar authLoading, token e userId
+      return;
+    }
     try {
       const data = await buscar(`/categories/user/${userId}`, token);
       setCategorys(data);
     } catch (error: any) {
       toast({
-        title: "Erro ao buscar Categorys",
+        title: "Erro ao buscar Categorias",
         description: error.message || "Erro durante a operação.",
         variant: "destructive",
       });
-      setCategorys([]);
+      setCategorys([]); // Definir como array vazio em caso de erro
     }
-  }, [token, userId]);
+  }, [token, userId, authLoading]);
 
   const addCategory = async (category: Omit<Category, "id">) => {
     try {
-      const newCategory = await register("/categories", { ...category, userId }, token);
+      const newCategory = await register(
+        "/categories",
+        { ...category, userId },
+        token
+      );
       setCategorys((prev) => [...prev, newCategory]);
       return newCategory;
     } catch (error: any) {
@@ -386,7 +446,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     category: Partial<Omit<Category, "id">>
   ) => {
     try {
-      const updated = await atualizar(`/categories`, { ...category, id, userId }, token);
+      const updated = await atualizar(
+        `/categories`,
+        { ...category, id, userId },
+        token
+      );
       setCategorys((prev) => prev.map((c) => (c.id === id ? updated : c)));
       return updated;
     } catch (error: any) {
