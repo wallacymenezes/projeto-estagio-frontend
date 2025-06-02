@@ -99,7 +99,7 @@ export default function DashboardPage() {
     (acc, expense) => {
       const categoryId =
         typeof expense.category === "object"
-          ? expense.category.id
+          ? expense.category?.id
           : expense.category;
       const categoryName = getCategoryName(categoryId);
       acc[categoryName] = (acc[categoryName] ?? 0) + expense.value;

@@ -29,12 +29,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
-import { PieChart } from "@/components/charts";
 import { Badge } from "@/components/ui/badge";
 import type { Expense, ExpenseStatus } from "@/models/Expense";
-import { DailyExpensesChart } from "@/components/DailyExpensesChart";
+// import { DailyExpensesChart } from "@/components/DailyExpensesChart"; // Removido
 import type { Earning } from "@/models/Earning";
 import type { Investment } from "@/models/Investment";
+// import { PieChart } from "@/components/charts"; // Removido
 
 export default function DespesasPage() {
   const {
@@ -59,21 +59,21 @@ export default function DespesasPage() {
 
   const filteredExpenses = useMemo(() =>
     Expenses.filter((despesa) => {
-      if (!despesa || !despesa.creationDate) return false; // Verificação adicional
+      if (!despesa?.creationDate) return false;
       const date = new Date(despesa.creationDate);
       return date >= dateRange.from && date <= dateRange.to;
     }), [Expenses, dateRange]);
 
   const filteredEarnings = useMemo(() =>
     Earnings.filter((earning) => {
-      if (!earning || !earning.creationDate) return false;
+      if (!earning?.creationDate) return false;
       const date = new Date(earning.creationDate);
       return date >= dateRange.from && date <= dateRange.to;
     }), [Earnings, dateRange]);
 
   const filteredInvestments = useMemo(() =>
     Investments.filter((investment) => {
-      if (!investment || !investment.creation_date) return false;
+      if (!investment?.creation_date) return false;
       const date = new Date(investment.creation_date);
       return date >= dateRange.from && date <= dateRange.to;
     }), [Investments, dateRange]);
@@ -82,9 +82,9 @@ export default function DespesasPage() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        // fetchCategorys é chamado dentro de fetchExpenses agora, se necessário
         await Promise.all([
-          fetchExpenses(),
-          fetchCategorys(),
+          fetchExpenses(), // fetchExpenses agora pode chamar fetchCategorys
           fetchEarnings(),
           fetchInvestments(),
         ]);
@@ -93,7 +93,8 @@ export default function DespesasPage() {
       }
     };
     loadInitialData();
-  }, [fetchExpenses, fetchCategorys, fetchEarnings, fetchInvestments]);
+  // Removido fetchCategorys daqui, pois fetchExpenses pode lidar com isso.
+  }, [fetchExpenses, fetchEarnings, fetchInvestments]);
 
 
   const handleEdit = (despesa: Expense) => {
@@ -131,9 +132,8 @@ export default function DespesasPage() {
       ),
     },
     {
-      // accessorKey: "category.name", // Usar uma função accessor para segurança
-      accessorFn: row => row.category?.name, // Função accessor para obter o nome da categoria
-      id: "categoryName", // ID único para a coluna
+      accessorFn: row => row.category?.name,
+      id: "categoryName",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -144,8 +144,8 @@ export default function DespesasPage() {
         </Button>
       ),
       cell: ({ row }) => {
-        const category = row.original.category; // Acessa o objeto category diretamente
-        return category?.name || "Sem categoria"; // Exibe o nome ou "Sem categoria"
+         // Acessa o objeto category populado pelo DataContext
+        return row.original.category?.name || "Sem categoria";
       }
     },
     {
@@ -187,8 +187,8 @@ export default function DespesasPage() {
         </Button>
       ),
       cell: ({ row }) => {
-        const status = row.original.status; // Acessar diretamente de row.original
-        let statusText = "Desconhecido";
+        const status = row.original.status as ExpenseStatus;
+        let statusText = "";
         let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "outline";
         let customStyle: React.CSSProperties = {};
 
@@ -204,8 +204,13 @@ export default function DespesasPage() {
             customStyle = { backgroundColor: 'hsl(var(--chart-4))', color: 'hsl(var(--primary-foreground))', borderColor: 'hsl(var(--chart-4))' };
             break;
           case "OVERDUE":
-            statusText = "Atrasado";
+            statusText = "Atrasada";
             badgeVariant = "destructive";
+            break;
+          case "CANCELLED": // Novo status adicionado
+            statusText = "Cancelada";
+            badgeVariant = "outline"; // Cinza para cancelado
+            customStyle = { color: 'hsl(var(--muted-foreground))', borderColor: 'hsl(var(--muted-foreground))' };
             break;
           default:
              statusText = status ? String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase() : "Desconhecido";
@@ -278,7 +283,6 @@ export default function DespesasPage() {
 
   const saldoASobrar = useMemo(() =>
     totalGanhosPeriodo - totalTodasDespesasPeriodo - totalInvestidoPeriodo, [totalGanhosPeriodo, totalTodasDespesasPeriodo, totalInvestidoPeriodo]);
-
 
   return (
     <div className="space-y-6 min-h-full">
@@ -372,6 +376,8 @@ export default function DespesasPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Gráficos foram removidos */}
 
       <Card>
         <CardHeader>

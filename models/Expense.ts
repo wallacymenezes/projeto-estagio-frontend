@@ -1,8 +1,6 @@
-// wallacymenezes/projeto-estagio-frontend/projeto-estagio-frontend-d0eaefe2ab734cdf8502a055fd12d3c722944237/models/Expense.ts
 import type { Category } from "./Category";
 
-// Definir os possíveis status para uma despesa
-export type ExpenseStatus = "PAID" | "PENDING" | "OVERDUE";
+export type ExpenseStatus = "PAID" | "PENDING" | "OVERDUE" | "CANCELLED";
 
 export interface Expense {
   id: number;
@@ -10,7 +8,10 @@ export interface Expense {
   description?: string;
   value: number;
   creationDate: string;
-  category: Category;
+  /** Representa o objeto Category populado no frontend. A API pode retornar um categoryId. */
+  category: Category | null;
+  /** O ID da categoria como retornado pela API, usado para popular o objeto 'category'. */
+  categoryId?: number; // Adicionado para manter o ID original da API
   userId?: string;
-  status: ExpenseStatus; // Novo campo adicionado
+  status: ExpenseStatus;
 }

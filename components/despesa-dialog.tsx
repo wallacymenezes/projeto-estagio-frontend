@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
-import type { Expense, ExpenseStatus } from "@/models/Expense" // Importar ExpenseStatus
+import type { Expense, ExpenseStatus } from "@/models/Expense"
 import type { Category } from "@/models/Category"
 
 interface DespesaDialogProps {
@@ -37,7 +37,7 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
   const [description, setDescription] = useState("")
   const [value, setValue] = useState("")
   const [category, setCategory] = useState<Category | null>(null)
-  const [status, setStatus] = useState<ExpenseStatus>("PENDING") // Novo estado para status
+  const [status, setStatus] = useState<ExpenseStatus>("PENDING")
 
   useEffect(() => {
     if (open) {
@@ -45,14 +45,14 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
         setName(despesa.name)
         setDescription(despesa.description ?? "")
         setValue(despesa.value.toString())
-        setCategory(despesa.category) // Assumindo que despesa.category é um objeto Category
-        setStatus(despesa.status || "PENDING") // Definir status, com fallback para PENDENTE
+        setCategory(despesa.category)
+        setStatus(despesa.status || "PENDING")
       } else {
         setName("")
         setDescription("")
         setValue("")
         setCategory(null)
-        setStatus("PENDING") // Status padrão para nova despesa
+        setStatus("PENDING")
       }
     }
   }, [open, despesa])
@@ -81,34 +81,28 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
     setLoading(true)
 
     try {
-      // O tipo aqui deve corresponder ao que addExpense/updateExpense esperam.
-      // Se category é um objeto no formulário, mas a API espera um ID, ajuste aqui.
-      const despesaData = {
+      // O DataContext espera o objeto Category completo aqui.
+      const despesaDataPayload = {
         name,
         description,
         value: Number.parseFloat(value),
-        category: category, // Enviar o objeto Category ou apenas o ID, conforme esperado pelo backend/DataContext
-        userId: despesa?.userId,
-        status, // Adicionar status
+        category: category, // CORREÇÃO: Passar o objeto Category completo
+        status,
+        // userId é adicionado no DataContext
       };
 
       if (despesa) {
-        // O tipo para updateExpense no DataContext é Partial<Omit<Expense, "id" | "creationDate" | "category">> & { category?: number | Category, status?: ExpenseStatus }
-        // Ajuste o payload conforme necessário, especialmente para `category`
-        await updateExpense(despesa.id, {
-            ...despesaData,
-            category: category.id, // Enviando o ID da categoria para o backend
-        });
+        // A tipagem de updateExpense no DataContext espera Partial<Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">>
+        // e category será o objeto.
+        await updateExpense(despesa.id, despesaDataPayload as Partial<Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">>);
         toast({
           title: "Despesa atualizada",
           description: "A despesa foi atualizada com sucesso.",
         })
       } else {
-        // O tipo para addExpense no DataContext é Omit<Expense, "id" | "creationDate" | "category"> & { category: number | Category, status: ExpenseStatus }
-        await addExpense({
-            ...despesaData,
-            category: category.id, // Enviando o ID da categoria para o backend
-        });
+        // A tipagem de addExpense no DataContext espera Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">
+        // e category será o objeto.
+        await addExpense(despesaDataPayload as Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">);
         toast({
           title: "Despesa adicionada",
           description: "A despesa foi adicionada com sucesso.",
@@ -198,8 +192,6 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Novo campo para Status */}
             <div className="grid gap-2">
               <Label htmlFor="status">Status</Label>
               <Select
@@ -214,6 +206,7 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
                   <SelectItem value="PENDING">Pendente</SelectItem>
                   <SelectItem value="PAID">Pago</SelectItem>
                   <SelectItem value="OVERDUE">Atrasado</SelectItem>
+                  <SelectItem value="CANCELLED">Cancelada</SelectItem>
                 </SelectContent>
               </Select>
             </div>
