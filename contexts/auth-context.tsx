@@ -16,7 +16,7 @@ import { toast } from "@/hooks/use-toast";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  handleLogin(loginRequest: LoginRequest): Promise<void>;
+  handleLogin(loginRequest: LoginRequest): Promise<Boolean>;
   registerService: (
     name: string,
     email: string,
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  async function handleLogin(loginRequest: LoginRequest) {
+  async function handleLogin(loginRequest: LoginRequest): Promise<boolean> {
     setLoading(true);
     try {
       const userDTO: User = await login("/auth/login", loginRequest);
@@ -75,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Login realizado com sucesso!",
       });
+      return true;
     } catch (error: any) {
       toast({
         title: "Erro ao fazer login",
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           error.message || "Verifique suas credenciais e tente novamente.",
         variant: "destructive",
       });
+      return false;
     } finally {
       setLoading(false);
     }

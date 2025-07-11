@@ -59,8 +59,12 @@ const LoginForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    handleLogin(loginRequest)
-    router.push("/dashboard")
+    const success =  await handleLogin(loginRequest)
+    
+    if (success) {
+      router.push("/dashboard")
+    }
+    setLoading(false)
   }
 
   function atualizarEstado(e: ChangeEvent<HTMLInputElement>) {
