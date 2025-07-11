@@ -1,12 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    // Disable static generation for auth pages
-    // This prevents the "useAuth must be used within an AuthProvider" error during build
-    appDir: true,
-  },
-  // Disable static generation for auth pages
+  // A chave 'experimental' foi removida.
   output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
