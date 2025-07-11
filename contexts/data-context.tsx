@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
   useMemo,
+  useEffect, // Importar useEffect
 } from "react";
 import { Earning } from "@/models/Earning";
 import { Expense, ExpenseStatus } from "@/models/Expense";
@@ -35,6 +36,8 @@ interface DataContextType {
   Investments: Investment[];
   Objectives: Objective[];
   Categorys: Category[];
+
+  isLoadingData: boolean;
 
   fetchEarnings: () => Promise<void>;
   addEarning: (earning: Omit<Earning, "id" | "creationDate">) => Promise<Earning | undefined>;
@@ -84,11 +87,65 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const token = useMemo(() => user?.token || "", [user?.token]);
   const userId = useMemo(() => user?.userId || "", [user?.userId]);
 
+  const [isLoadingData, setIsLoadingData] = useState(true); // Novo estado de loading
   const [Earnings, setEarnings] = useState<Earning[]>([]);
   const [Expenses, setExpenses] = useState<Expense[]>([]);
   const [Investments, setInvestments] = useState<Investment[]>([]);
   const [Objectives, setObjectives] = useState<Objective[]>([]);
   const [Categorys, setCategorys] = useState<Category[]>([]);
+
+  useEffect(() => {
+    // Só executa quando a autenticação terminar e tivermos um usuário válido
+    if (!authLoading && userId && token) {
+      const fetchAllInitialData = async () => {
+        setIsLoadingData(true);
+        try {
+          // Busca categorias primeiro, pois as despesas dependem delas para serem populadas
+          const categoriesData = await buscar<Category[]>(`/categories/user/${userId}`, token);
+          setCategorys(categoriesData);
+
+          // Busca o resto dos dados em paralelo
+          const [earningsData, expensesFromApi, investmentsData, objectivesData] = await Promise.all([
+            buscar<Earning[]>(`/earnings/user/${userId}`, token),
+            buscar<BackendExpenseData[]>(`/expenses/user/${userId}`, token),
+            buscar<Investment[]>(`/investments/user/${userId}`, token),
+            buscar<Objective[]>(`/objectives/user/${userId}`, token),
+          ]);
+
+          // Popula as despesas com os detalhes das categorias buscadas
+          const populatedExpenses: Expense[] = expensesFromApi.map(exp => {
+            const categoryDetail = categoriesData.find(cat => cat.id === exp.categoryId);
+            return {
+              ...exp,
+              category: categoryDetail || null,
+              categoryId: exp.categoryId,
+            };
+          });
+
+          setEarnings(earningsData);
+          setExpenses(populatedExpenses);
+          setInvestments(investmentsData);
+          setObjectives(objectivesData);
+
+        } catch (error: any) {
+          console.error("DataContext: Erro ao buscar dados iniciais.", error);
+          toast({ title: "Erro ao carregar dados", description: "Não foi possível carregar as informações.", variant: "destructive" });
+        } finally {
+          setIsLoadingData(false);
+        }
+      };
+
+      fetchAllInitialData();
+    } else if (!authLoading) {
+      // Se a autenticação terminou e não há usuário, limpa os dados
+      setIsLoadingData(false);
+      setEarnings([]);
+      setExpenses([]);
+      setInvestments([]);
+      setObjectives([]);
+      setCategorys([]);
+    }
+  }, [userId, token, authLoading]);
 
   const fetchCategorys = useCallback(async () => {
     if (authLoading || !token || !userId) return;
@@ -104,23 +161,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const fetchExpenses = useCallback(async () => {
     if (authLoading || !token || !userId) return;
     try {
-      if (Categorys.length === 0 && userId) { // Garante que userId existe antes de chamar fetchCategorys
-        await fetchCategorys();
-      }
+      const categoriesData = await buscar<Category[]>(`/categories/user/${userId}`, token);
+      setCategorys(categoriesData);
+      
       const expensesFromApi: BackendExpenseData[] = await buscar(`/expenses/user/${userId}`, token);
       const populatedExpenses: Expense[] = expensesFromApi.map(exp => {
-        const categoryDetail = Categorys.find(cat => cat.id === exp.categoryId);
-        return {
-          ...exp,
-          category: categoryDetail || null, // CORREÇÃO: Garante que seja Category | null
-        };
+        const categoryDetail = categoriesData.find(cat => cat.id === exp.categoryId);
+        return { ...exp, category: categoryDetail || null };
       });
       setExpenses(populatedExpenses);
-    } catch (error: any) {
-      toast({ title: "Erro ao buscar Despesas", description: error.message || "Erro.", variant: "destructive" });
-      setExpenses([]);
-    }
-  }, [token, userId, authLoading, Categorys, fetchCategorys]);
+    } catch (error) { /* ... */ }
+  }, [token, userId, authLoading]);
 
 
   const addExpense = async (expenseData: Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">): Promise<Expense | undefined> => {
@@ -471,6 +522,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         Investments,
         Objectives,
         Categorys,
+        isLoadingData,
         fetchEarnings,
         addEarning,
         updateEarning,

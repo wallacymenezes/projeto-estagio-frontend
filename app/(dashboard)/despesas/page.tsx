@@ -32,8 +32,6 @@ import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import type { Expense, ExpenseStatus } from "@/models/Expense";
 // import { DailyExpensesChart } from "@/components/DailyExpensesChart"; // Removido
-import type { Earning } from "@/models/Earning";
-import type { Investment } from "@/models/Investment";
 // import { PieChart } from "@/components/charts"; // Removido
 
 export default function DespesasPage() {
@@ -42,10 +40,7 @@ export default function DespesasPage() {
     Categorys,
     Earnings,
     Investments,
-    fetchExpenses,
-    fetchCategorys,
-    fetchEarnings,
-    fetchInvestments,
+    // Não precisamos mais das funções de fetch para o carregamento inicial aqui
     deleteExpense,
   } = useData();
 
@@ -77,24 +72,6 @@ export default function DespesasPage() {
       const date = new Date(investment.creation_date);
       return date >= dateRange.from && date <= dateRange.to;
     }), [Investments, dateRange]);
-
-
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        // fetchCategorys é chamado dentro de fetchExpenses agora, se necessário
-        await Promise.all([
-          fetchExpenses(), // fetchExpenses agora pode chamar fetchCategorys
-          fetchEarnings(),
-          fetchInvestments(),
-        ]);
-      } catch (error) {
-        console.error("DespesasPage: Erro ao buscar dados iniciais", error);
-      }
-    };
-    loadInitialData();
-  // Removido fetchCategorys daqui, pois fetchExpenses pode lidar com isso.
-  }, [fetchExpenses, fetchEarnings, fetchInvestments]);
 
 
   const handleEdit = (despesa: Expense) => {

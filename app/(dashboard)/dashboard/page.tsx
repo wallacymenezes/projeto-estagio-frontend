@@ -30,10 +30,8 @@ export default function DashboardPage() {
     Expenses,
     Investments,
     Objectives,
-    fetchEarnings,
-    fetchExpenses,
-    fetchInvestments,
-    fetchObjectives,
+    Categorys,
+    // Não precisamos mais das funções de fetch para o carregamento inicial aqui
   } = useData();
 
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
@@ -48,41 +46,12 @@ export default function DashboardPage() {
     objectives: 0,
   });
 
-  const { user, loading } = useAuth();
-
   // Função intermediária para garantir que from e to não são undefined
   function handleDateChange(range: { from?: Date; to?: Date }) {
     if (range.from && range.to) {
       setDateRange({ from: range.from, to: range.to });
     }
   }
-
-  useEffect(() => {
-    if (!loading && user?.userId && user?.token) {
-      console.log("Fazendo fetch dos dados...");
-
-      const fetchData = async () => {
-        try {
-          await Promise.all([
-            fetchEarnings(),
-            fetchExpenses(),
-            fetchInvestments(),
-            fetchObjectives(),
-          ]);
-          console.log("Fetch concluído");
-        } catch (error) {
-          console.error("Erro no fetch:", error);
-        }
-      };
-      fetchData();
-    }
-  }, [fetchEarnings, fetchExpenses, fetchInvestments, fetchObjectives]);
-
-  const { fetchCategorys, Categorys } = useData();
-
-  useEffect(() => {
-    fetchCategorys();
-  }, [fetchCategorys]);
 
   const filteredExpenses = Expenses.filter((expense) => {
     const date = new Date(expense.creationDate);
