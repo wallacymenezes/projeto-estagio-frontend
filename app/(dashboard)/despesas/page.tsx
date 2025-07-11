@@ -109,8 +109,8 @@ export default function DespesasPage() {
       ),
     },
     {
-      accessorFn: row => row.category?.name,
-      id: "categoryName",
+      id: "categoryName", // É bom ter um ID único quando se usa accessorFn
+      accessorFn: (row) => row.category?.name, // Função para acessar o nome da categoria de forma segura
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -121,9 +121,10 @@ export default function DespesasPage() {
         </Button>
       ),
       cell: ({ row }) => {
-         // Acessa o objeto category populado pelo DataContext
-        return row.original.category?.name || "Sem categoria";
-      }
+        // Acessamos o objeto category populado diretamente de row.original
+        const categoryName = row.original.category?.name;
+        return categoryName || "Sem categoria";
+      },
     },
     {
       accessorKey: "value",
