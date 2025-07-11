@@ -217,7 +217,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
 
 
-      const updatedExpenseFromApi: BackendExpenseData = await atualizar(`/expenses/${id}`, payload, token);
+      const updatedExpenseFromApi: BackendExpenseData = await atualizar(`/expenses`, payload, token);
       const categoryDetail = updatedExpenseFromApi.categoryId ? Categorys.find(cat => cat.id === updatedExpenseFromApi.categoryId) : null;
       const updatedPopulatedExpense: Expense = {
         ...updatedExpenseFromApi,
@@ -286,7 +286,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   ): Promise<Earning | undefined> => {
     try {
       const updated: Earning = await atualizar(
-        `/earnings/${id}`,
+        `/earnings`,
         { ...earning, id, userId },
         token
       );
@@ -357,8 +357,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   ): Promise<Investment | undefined> => {
     try {
       const updated: Investment = await atualizar(
-        `/investments/${id}`, // Assumindo que o backend espera o ID na URL para PUT
-        { ...investment, userId }, // Removido 'id' do corpo se já está na URL
+        `/investments`, // Assumindo que o backend espera o ID na URL para PUT
+        { ...investment, id, userId }, // Removido 'id' do corpo se já está na URL
         token
       );
       setInvestments((prev) => prev.map((i) => (i.id === id ? updated : i)));
@@ -428,7 +428,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   ): Promise<Objective | undefined> => {
     try {
       const updated: Objective = await atualizar(
-        `/objectives/${id}`,
+        `/objectives`,
         { ...objective, id, userId },
         token
       );
@@ -484,8 +484,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   ): Promise<Category | undefined> => {
     try {
       const updated: Category = await atualizar(
-        `/categories/${id}`, // Assumindo que o backend espera o ID na URL para PUT
-        { ...category, userId }, // Removido 'id' do corpo se já está na URL
+        `/categories`, // Assumindo que o backend espera o ID na URL para PUT
+        { ...category, id, userId }, // Removido 'id' do corpo se já está na URL
         token
       );
       setCategorys((prev) => prev.map((c) => (c.id === id ? updated : c)));
