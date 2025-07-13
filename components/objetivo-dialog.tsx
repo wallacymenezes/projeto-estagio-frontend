@@ -20,7 +20,6 @@ import { ptBR } from "date-fns/locale"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-
 import type { Objective } from "@/models/Objective"
 
 interface ObjetivoDialogProps {
@@ -35,18 +34,21 @@ export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogP
   const [loading, setLoading] = useState(false)
 
   const [name, setName] = useState("")
-  const [targetValue, setTargetValue] = useState("")
+  const [target, setTarget] = useState("")
   const [term, setTerm] = useState<Date | undefined>(undefined)
+
+  // Estado para controlar a abertura do Popover do calendário
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
   useEffect(() => {
     if (open) {
       if (objetivo) {
         setName(objetivo.name)
-        setTargetValue(objetivo.targetValue.toString())
+        setTarget(objetivo.target.toString())
         setTerm(objetivo.term ? new Date(objetivo.term) : undefined)
       } else {
         setName("")
-        setTargetValue("")
+        setTarget("")
         setTerm(undefined)
       }
     }
@@ -55,7 +57,7 @@ export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!name || !targetValue || !term) {
+    if (!name || !target || !term) {
       toast({
         title: "Campos obrigatórios",
         description: "Preencha todos os campos obrigatórios.",
@@ -69,8 +71,8 @@ export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogP
     try {
       const objetivoData = {
         name,
-        targetValue: Number.parseFloat(targetValue),
-        term: term.toISOString(),
+        target: Number.parseFloat(target),
+        term: format(term, "yyyy-MM-dd"),
       }
 
       if (objetivo) {
@@ -80,7 +82,7 @@ export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogP
           description: "O objetivo foi atualizado com sucesso.",
         })
       } else {
-        await addObjective(objetivoData)
+        await addObjective(objetivoData as Omit<Objective, "id">)
         toast({
           title: "Objetivo adicionado",
           description: "O objetivo foi adicionado com sucesso.",
@@ -131,32 +133,36 @@ export function ObjetivoDialog({ open, onOpenChange, objetivo }: ObjetivoDialogP
                 type="number"
                 step="0.01"
                 min="0"
-                value={targetValue}
-                onChange={(e) => setTargetValue(e.target.value)}
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
                 placeholder="0,00"
                 required
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="term">Data Limite</Label>
-              <Popover>
+              <Label htmlFor="term">Data de Prazo</Label>
+              {/* Popover controlado pelo estado 'isCalendarOpen' */}
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant={"outline"}
+                    id="term"
                     className={cn("w-full justify-start text-left font-normal", !term && "text-muted-foreground")}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {term ? format(term, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : <span>Selecione uma data</span>}
+                    {term ? format(term, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
                     selected={term}
-                    onSelect={setTerm}
-                    initialFocus
+                    onSelect={(date) => {
+                      setTerm(date)
+                      setIsCalendarOpen(false) // Fecha o calendário após a seleção
+                    }}
+                    captionLayout="dropdown"
                     locale={ptBR}
-                    disabled={(date) => date < new Date()}
                   />
                 </PopoverContent>
               </Popover>

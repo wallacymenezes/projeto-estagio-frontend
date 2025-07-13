@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useData } from "@/contexts/data-context";
-import { useAuth } from "@/contexts/auth-context";
+import { Variants } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -21,7 +21,6 @@ import {
   BanknoteIcon,
   CoinsIcon,
   LineChartIcon,
-  TargetIcon,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -193,14 +192,18 @@ export default function DashboardPage() {
   })();
 
   // Animação para cards
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: (i: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" },
-    }),
-  };
+  const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i: number = 1) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: i * 0.1,
+      duration: 0.5,
+      ease: [0.42, 0, 0.58, 1] // Cubic bezier para easeInOut
+    }
+  })
+};
 
   return (
     <div className="space-y-6">

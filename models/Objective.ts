@@ -1,7 +1,7 @@
 export interface Objective {
   id: number;
   name: string;
-  targetValue: number;
+  target: number;
   creationDate: string;
   term: string;
   userId?: string;

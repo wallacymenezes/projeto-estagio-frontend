@@ -33,7 +33,7 @@ api.interceptors.response.use(
   },
   (error) => {
     // Se o erro for 401 (Unauthorized), redirecionar para o login
-    if (error.response && error.response.status === 401) {
+    if (error.response && error.response.status === 401 || error.response.status === 403) {
       localStorage.removeItem("token")
       window.location.href = "/login"
     }

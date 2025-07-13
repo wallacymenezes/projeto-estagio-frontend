@@ -403,8 +403,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [token, userId, authLoading]);
 
-  const addObjective = async (objective: Omit<Objective, "id" | "creationDate">): Promise<Objective | undefined> => {
+  const addObjective = async (
+    objective: Omit<Objective, "id" | "creationDate">
+  ): Promise<Objective | undefined> => {
     try {
+      // O payload enviado já terá 'target' em vez de 'targetValue' por causa da interface
       const newObjective: Objective = await register(
         "/objectives",
         { ...objective, userId },
@@ -427,8 +430,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     objective: Partial<Omit<Objective, "id" | "creationDate">>
   ): Promise<Objective | undefined> => {
     try {
+       // O payload enviado já terá 'target' se ele estiver sendo atualizado
       const updated: Objective = await atualizar(
-        `/objectives`,
+        `/objectives/${id}`,
         { ...objective, id, userId },
         token
       );
