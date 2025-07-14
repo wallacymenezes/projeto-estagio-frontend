@@ -71,11 +71,11 @@ export default function ObjetivosPage() {
     }
   };
 
-  // Calcular valorAtual para cada objetivo somando investimentos relacionados
   const objetivosComValorAtual = useMemo(() => {
     return Objectives.map((obj) => {
+      // CORREÇÃO: Acessar inv.objectiveId diretamente
       const valorAtual = Investments.filter(
-        (inv) => inv.objectiveId?.id === obj.id
+        (inv) => inv.objectiveId === obj.id
       ).reduce((acc, inv) => acc + inv.value, 0);
 
       return {
@@ -99,7 +99,8 @@ export default function ObjetivosPage() {
       ),
     },
     {
-      accessorKey: "targetValue",
+      // CORREÇÃO: Alterado de targetValue para target
+      accessorKey: "target",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -109,7 +110,8 @@ export default function ObjetivosPage() {
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => formatCurrency(row.getValue("targetValue")),
+      // CORREÇÃO: Obter valor de "target"
+      cell: ({ row }) => formatCurrency(row.getValue("target")),
     },
     {
       id: "valorAtual",
@@ -121,7 +123,8 @@ export default function ObjetivosPage() {
       header: "Progresso",
       cell: ({ row }) => {
         const valorAtual = row.original.valorAtual;
-        const valorAlvo = row.original.targetValue;
+        // CORREÇÃO: Usar row.original.target
+        const valorAlvo = row.original.target;
         const progresso = valorAlvo > 0 ? (valorAtual / valorAlvo) * 100 : 0;
 
         return (
@@ -150,7 +153,8 @@ export default function ObjetivosPage() {
       ),
       cell: ({ row }) => {
         const term = row.getValue("term") as string;
-        return term ? new Date(term).toLocaleDateString("pt-BR") : "Sem prazo";
+        // Adicionando um timezone para consistência na formatação da data
+        return term ? new Date(term + 'T00:00:00').toLocaleDateString("pt-BR") : "Sem prazo";
       },
     },
     {
@@ -201,8 +205,9 @@ export default function ObjetivosPage() {
   ];
 
   const totalObjectives = objetivosComValorAtual.length;
+  // CORREÇÃO: Usar obj.target
   const valorTotalAlvo = objetivosComValorAtual.reduce(
-    (acc, obj) => acc + obj.targetValue,
+    (acc, obj) => acc + obj.target,
     0
   );
   const valorTotalAtual = objetivosComValorAtual.reduce(
