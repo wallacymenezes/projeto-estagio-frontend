@@ -28,9 +28,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { StackedProgressBar } from "@/components/ui/stacked-progress-bar";
 
 import type { Objective } from "@/models/Objective";
 import type { Investment } from "@/models/Investment";
+
+const PROGRESS_COLORS = [
+  '#60a5fa', // blue-400
+  '#4ade80', // green-400
+  '#fbbf24', // amber-400
+  '#f87171', // red-400
+  '#a78bfa', // violet-400
+  '#2dd4bf', // teal-400
+  '#fb923c', // orange-400
+  '#f472b6', // pink-400
+];
 
 export default function ObjetivosPage() {
   const {
@@ -73,19 +85,20 @@ export default function ObjetivosPage() {
 
   const objetivosComValorAtual = useMemo(() => {
     return Objectives.map((obj) => {
-      // CORREÇÃO: Acessar inv.objectiveId diretamente
-      const valorAtual = Investments.filter(
+      const relatedInvestments = Investments.filter(
         (inv) => inv.objectiveId === obj.id
-      ).reduce((acc, inv) => acc + inv.value, 0);
+      );
+      const valorAtual = relatedInvestments.reduce((acc, inv) => acc + inv.value, 0);
 
       return {
         ...obj,
         valorAtual,
+        relatedInvestments,
       };
     });
   }, [Objectives, Investments]);
 
-  const columns: ColumnDef<Objective & { valorAtual: number }>[] = [
+  const columns: ColumnDef<Objective & { valorAtual: number; relatedInvestments: Investment[] }>[] = [
     {
       accessorKey: "name",
       header: ({ column }) => (
@@ -99,7 +112,6 @@ export default function ObjetivosPage() {
       ),
     },
     {
-      // CORREÇÃO: Alterado de targetValue para target
       accessorKey: "target",
       header: ({ column }) => (
         <Button
@@ -110,7 +122,6 @@ export default function ObjetivosPage() {
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      // CORREÇÃO: Obter valor de "target"
       cell: ({ row }) => formatCurrency(row.getValue("target")),
     },
     {
@@ -122,20 +133,25 @@ export default function ObjetivosPage() {
       id: "progresso",
       header: "Progresso",
       cell: ({ row }) => {
-        const valorAtual = row.original.valorAtual;
-        // CORREÇÃO: Usar row.original.target
-        const valorAlvo = row.original.target;
-        const progresso = valorAlvo > 0 ? (valorAtual / valorAlvo) * 100 : 0;
+        const { valorAtual, target: valorAlvo, relatedInvestments } = row.original;
+        const progressoTotal = valorAlvo > 0 ? (valorAtual / valorAlvo) * 100 : 0;
+        
+        const segments = relatedInvestments.map((inv, index) => ({
+          value: valorAlvo > 0 ? (inv.value / valorAlvo) * 100 : 0,
+          color: PROGRESS_COLORS[index % PROGRESS_COLORS.length],
+          tooltip: `${inv.name}: ${formatCurrency(inv.value)}`
+        }));
 
         return (
           <div className="w-full">
             <div className="flex justify-between mb-1 text-xs">
-              <span>{progresso.toFixed(0)}%</span>
+              <span>{progressoTotal.toFixed(0)}%</span>
               <span>
                 {formatCurrency(valorAtual)} de {formatCurrency(valorAlvo)}
               </span>
             </div>
-            <Progress value={progresso} className="h-2" />
+            {/* Mantém a barra colorida na tabela */}
+            <StackedProgressBar segments={segments} />
           </div>
         );
       },
@@ -153,7 +169,6 @@ export default function ObjetivosPage() {
       ),
       cell: ({ row }) => {
         const term = row.getValue("term") as string;
-        // Adicionando um timezone para consistência na formatação da data
         return term ? new Date(term + 'T00:00:00').toLocaleDateString("pt-BR") : "Sem prazo";
       },
     },
@@ -161,7 +176,6 @@ export default function ObjetivosPage() {
       id: "actions",
       cell: ({ row }) => {
         const objective = row.original;
-
         return (
           <div className="flex items-center gap-2">
             <Button
@@ -205,7 +219,6 @@ export default function ObjetivosPage() {
   ];
 
   const totalObjectives = objetivosComValorAtual.length;
-  // CORREÇÃO: Usar obj.target
   const valorTotalAlvo = objetivosComValorAtual.reduce(
     (acc, obj) => acc + obj.target,
     0
@@ -233,7 +246,7 @@ export default function ObjetivosPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
@@ -259,7 +272,8 @@ export default function ObjetivosPage() {
               {formatCurrency(valorTotalAtual)} de{" "}
               {formatCurrency(valorTotalAlvo)}
             </div>
-            <Progress value={progressoGeral} className="h-2" />
+            {/* CORREÇÃO: Usando o componente Progress padrão com a cor roxa */}
+            <Progress value={progressoGeral} className="h-2 [&>div]:bg-purple-600" />
           </CardContent>
         </Card>
       </div>
