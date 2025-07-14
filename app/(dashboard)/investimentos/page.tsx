@@ -1,6 +1,7 @@
+// wallacymenezes/projeto-estagio-frontend/projeto-estagio-frontend-d0eaefe2ab734cdf8502a055fd12d3c722944237/app/(dashboard)/investimentos/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DateRangePicker } from "@/components/date-range-picker";
+import { DateRangePicker, type DateRange } from "@/components/date-range-picker";
 import { DataTable } from "@/components/data-table";
 import { InvestimentoDialog } from "@/components/investimento-dialog";
 import { formatCurrency } from "@/lib/utils";
@@ -29,16 +30,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import type { Investment } from "@/models/Investment";
-import type { DateRange } from "@/components/date-range-picker";
 
 export default function InvestimentosPage() {
-  const { Investments, fetchInvestments, deleteInvestment } = useData();
+  const { Investments, Objectives, fetchInvestments, fetchObjectives, deleteInvestment } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedInvestment, setSelectedInvestment] =
     useState<Investment | null>(null);
-  const [filteredInvestments, setFilteredInvestments] = useState<Investment[]>(
-    []
-  );
 
   const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -47,17 +44,15 @@ export default function InvestimentosPage() {
 
   useEffect(() => {
     fetchInvestments();
-  }, [fetchInvestments]);
+    fetchObjectives();
+  }, [fetchInvestments, fetchObjectives]);
 
-  useEffect(() => {
-    setFilteredInvestments(
-      Investments.filter((investment) => {
-        const date = new Date(investment.creation_date);
-        // Verifica se from e to existem antes de comparar
-        if (!dateRange.from || !dateRange.to) return true;
-        return date >= dateRange.from && date <= dateRange.to;
-      })
-    );
+  const filteredInvestments = useMemo(() => {
+    return Investments.filter((investment) => {
+      const date = new Date(investment.creation_date);
+      if (!dateRange.from || !dateRange.to) return true;
+      return date >= dateRange.from && date <= dateRange.to;
+    });
   }, [Investments, dateRange]);
 
   const handleEdit = (investment: Investment) => {
@@ -95,6 +90,19 @@ export default function InvestimentosPage() {
       ),
     },
     {
+      // CORREÇÃO: Coluna para exibir o nome do objetivo
+      id: 'objective',
+      header: 'Objetivo',
+      cell: ({ row }) => {
+        const objectiveId = row.original.objectiveId;
+        if (!objectiveId) {
+          return "Nenhum";
+        }
+        const objective = Objectives.find(obj => obj.id === objectiveId);
+        return objective ? objective.name : "Nenhum";
+      },
+    },
+    {
       accessorKey: "value",
       header: ({ column }) => (
         <Button
@@ -109,15 +117,7 @@ export default function InvestimentosPage() {
     },
     {
       accessorKey: "percentage",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Rendimento (%)
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: "Rendimento (%)",
       cell: ({ row }) => `${row.getValue("percentage")}%`,
     },
     {
@@ -138,7 +138,6 @@ export default function InvestimentosPage() {
       id: "actions",
       cell: ({ row }) => {
         const investment = row.original;
-
         return (
           <div className="flex items-center gap-2">
             <Button
@@ -257,6 +256,7 @@ export default function InvestimentosPage() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         investimento={selectedInvestment}
+        objectives={Objectives}
       />
     </div>
   );
