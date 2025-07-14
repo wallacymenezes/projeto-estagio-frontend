@@ -1,4 +1,3 @@
-// wallacymenezes/projeto-estagio-frontend/projeto-estagio-frontend-d0eaefe2ab734cdf8502a055fd12d3c722944237/app/(dashboard)/investimentos/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -30,6 +29,56 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import type { Investment } from "@/models/Investment";
+
+// Função para calcular o rendimento líquido após o Imposto de Renda
+const calculateNetReturn = (investment: Investment): number => {
+  const { value, percentage, months, investmentType } = investment;
+
+  // 1. Calcula o rendimento bruto para o período
+  const annualRate = percentage / 100;
+  const grossReturn = value * (annualRate / 12) * months;
+
+  let taxRate = 0;
+
+  // 2. Determina a alíquota do IR com base no tipo de investimento e prazo
+  switch (investmentType) {
+    case "Tesouro Direto":
+    case "Certificado de Depósito Interbancário":
+      // Aplica a tabela regressiva (baseada em dias, aproximamos com meses)
+      const days = months * 30;
+      if (days <= 180) {
+        taxRate = 0.225; // 22,5%
+      } else if (days <= 360) {
+        taxRate = 0.20; // 20%
+      } else if (days <= 720) {
+        taxRate = 0.175; // 17,5%
+      } else {
+        taxRate = 0.15; // 15%
+      }
+      break;
+
+    case "Ações":// Assumindo a mesma regra de ações para simplificar
+      taxRate = 0.15; // 15% sobre o lucro
+      break;
+    
+    case "Fundo de Investimento Imobiliário":
+    case "Criptomoedas":
+    case "Poupança":
+      // Isentos para pessoa física
+      taxRate = 0;
+      break;
+      
+    default:
+      taxRate = 0;
+  }
+
+  // 3. Calcula o imposto e o rendimento líquido
+  const taxAmount = grossReturn * taxRate;
+  const netReturn = grossReturn - taxAmount;
+
+  return netReturn;
+};
+
 
 export default function InvestimentosPage() {
   const { Investments, Objectives, fetchInvestments, fetchObjectives, deleteInvestment } = useData();
@@ -90,7 +139,6 @@ export default function InvestimentosPage() {
       ),
     },
     {
-      // CORREÇÃO: Coluna para exibir o nome do objetivo
       id: 'objective',
       header: 'Objetivo',
       cell: ({ row }) => {
@@ -117,22 +165,17 @@ export default function InvestimentosPage() {
     },
     {
       accessorKey: "percentage",
-      header: "Rendimento (%)",
+      header: "Rendimento (% a.a.)",
       cell: ({ row }) => `${row.getValue("percentage")}%`,
     },
+    // Nova coluna para o Rendimento Líquido
     {
-      accessorKey: "creation_date",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Data Início
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) =>
-        new Date(row.getValue("creation_date")).toLocaleDateString("pt-BR"),
+      id: "netReturn",
+      header: "Rendimento Líquido",
+      cell: ({ row }) => {
+        const netReturn = calculateNetReturn(row.original);
+        return formatCurrency(netReturn);
+      }
     },
     {
       id: "actions",
@@ -180,14 +223,19 @@ export default function InvestimentosPage() {
     },
   ];
 
-  const totalInvested = filteredInvestments.reduce(
-    (acc, inv) => acc + inv.value,
-    0
+  const totalInvested = useMemo(() => 
+    filteredInvestments.reduce((acc, inv) => acc + inv.value, 0),
+    [filteredInvestments]
   );
-  const totalExpectedReturn = filteredInvestments.reduce(
-    (acc, inv) => acc + (inv.value * inv.percentage) / 100,
-    0
+  
+  // CORREÇÃO: O cálculo agora usa a função auxiliar
+  const totalExpectedReturn = useMemo(() =>
+    filteredInvestments.reduce((acc, inv) => {
+      return acc + calculateNetReturn(inv);
+    }, 0),
+    [filteredInvestments]
   );
+
 
   return (
     <div className="space-y-6">
@@ -224,7 +272,7 @@ export default function InvestimentosPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
-              Rendimento Esperado
+              Rendimento Líquido Esperado
             </CardTitle>
           </CardHeader>
           <CardContent>
