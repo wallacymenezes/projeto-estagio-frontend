@@ -54,15 +54,15 @@ export default function DespesasPage() {
 
   const filteredExpenses = useMemo(() =>
     Expenses.filter((despesa) => {
-      if (!despesa?.creationDate) return false;
-      const date = new Date(despesa.creationDate);
+      if (!despesa?.vencimento) return false;
+      const date = new Date(despesa.vencimento);
       return date >= dateRange.from && date <= dateRange.to;
     }), [Expenses, dateRange]);
 
   const filteredEarnings = useMemo(() =>
     Earnings.filter((earning) => {
-      if (!earning?.creationDate) return false;
-      const date = new Date(earning.creationDate);
+      if (!earning?.recebimento) return false;
+      const date = new Date(earning.recebimento);
       return date >= dateRange.from && date <= dateRange.to;
     }), [Earnings, dateRange]);
 
@@ -140,7 +140,7 @@ export default function DespesasPage() {
       cell: ({ row }) => formatCurrency(row.getValue("value")),
     },
     {
-      accessorKey: "creationDate",
+      accessorKey: "vencimento",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -150,8 +150,12 @@ export default function DespesasPage() {
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) =>
-        new Date(row.getValue("creationDate")).toLocaleDateString("pt-BR"),
+      cell: ({ row }) => {
+        const dateValue = row.getValue("vencimento") as string;
+        if (!dateValue) return "N/A";
+        // CORREÇÃO: Adicionar um horário neutro para evitar problemas de fuso horário
+        return new Date(dateValue + 'T00:00:00').toLocaleDateString("pt-BR");
+      },
     },
     {
       accessorKey: "status",
@@ -261,20 +265,18 @@ export default function DespesasPage() {
 
   const saldoASobrar = useMemo(() =>
     totalGanhosPeriodo - totalTodasDespesasPeriodo - totalInvestidoPeriodo, [totalGanhosPeriodo, totalTodasDespesasPeriodo, totalInvestidoPeriodo]);
-
+  function handleDateChange(range: { from?: Date; to?: Date }) {
+    if (range.from && range.to) {
+      setDateRange({ from: range.from, to: range.to });
+    }
+  }
+  
   return (
     <div className="space-y-6 min-h-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Despesas</h1>
         <div className="flex flex-col sm:flex-row gap-4">
-          <DateRangePicker
-            date={dateRange}
-            onDateChange={(date) => {
-              if (date?.from && date?.to) {
-                setDateRange({ from: date.from, to: date.to });
-              }
-            }}
-          />
+          <DateRangePicker onDateChange={handleDateChange} />
           <Button
             onClick={() => {
               setSelectedDespesa(null);

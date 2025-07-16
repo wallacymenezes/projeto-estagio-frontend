@@ -4,6 +4,8 @@ export interface Earning {
   description?: string;
   value: number;
   creationDate: string;
-  wage: boolean; // se é salário ou não
+  recebimento: string; // Novo campo
+  lastUpdate?: string; // Novo campo
+  wage: boolean;
   userId?: string;
 }

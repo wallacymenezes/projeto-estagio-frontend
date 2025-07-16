@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DateRangePicker } from "@/components/date-range-picker";
+import { DateRangePicker, type DateRange } from "@/components/date-range-picker";
 import { DataTable } from "@/components/data-table";
 import { GanhoDialog } from "@/components/ganho-dialog";
 import { formatCurrency } from "@/lib/utils";
@@ -28,38 +28,29 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
-import type { Earning } from "@/models/Earning"; // Importa o tipo correto do modelo
+import type { Earning } from "@/models/Earning";
 
 export default function GanhosPage() {
-  // Usar nomes e tipos do contexto correto:
-  const { Earnings, fetchEarnings, deleteEarning } = useData();
+  const { Earnings, deleteEarning } = useData(); // 1. Removido fetchEarnings, pois o DataContext já lida com a busca
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedGanho, setSelectedGanho] = useState<Earning | null>(null); // Ajuste do tipo para Earning
-  const [filteredGanhos, setFilteredGanhos] = useState<Earning[]>([]);
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+  const [selectedGanho, setSelectedGanho] = useState<Earning | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
   });
 
-  useEffect(() => {
-    fetchEarnings();
-  }, [fetchEarnings]);
+  // O useEffect para buscar dados foi removido, pois o DataContext agora gerencia isso.
 
-  useEffect(() => {
-    setFilteredGanhos(
-      Earnings.filter((ganho) => {
-        const date = new Date(ganho.creationDate);
-        return date >= dateRange.from && date <= dateRange.to;
-      })
-    );
+  const filteredGanhos = useMemo(() => {
+    if (!Earnings) return [];
+    return Earnings.filter((ganho) => {
+      // 2. CORREÇÃO: Usar 'recebimento' ou 'creationDate' como fallback no filtro
+      const date = new Date(ganho.recebimento || ganho.creationDate);
+      if (!dateRange?.from || !dateRange?.to) return true; // Adicionado '?' para segurança
+      return date >= dateRange.from && date <= dateRange.to;
+    });
   }, [Earnings, dateRange]);
 
-  // Função intermediária para corrigir problema do DateRangePicker
-  function handleDateChange(range: { from?: Date; to?: Date }) {
-    if (range.from && range.to) {
-      setDateRange({ from: range.from, to: range.to });
-    }
-  }
 
   const handleEdit = (ganho: Earning) => {
     setSelectedGanho(ganho);
@@ -94,7 +85,6 @@ export default function GanhosPage() {
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => row.getValue("name"),
     },
     {
       accessorKey: "value",
@@ -110,18 +100,21 @@ export default function GanhosPage() {
       cell: ({ row }) => formatCurrency(row.getValue("value")),
     },
     {
-      accessorKey: "creationDate",
+      accessorKey: "recebimento",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Data
+          Data de Recebimento
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) =>
-        new Date(row.getValue("creationDate")).toLocaleDateString("pt-BR"),
+      cell: ({ row }) => {
+        const dateValue = row.getValue("recebimento") as string;
+        if (!dateValue) return "N/A";
+        return new Date(dateValue + 'T00:00:00').toLocaleDateString("pt-BR");
+      }
     },
     {
       accessorKey: "wage",
@@ -132,7 +125,6 @@ export default function GanhosPage() {
       id: "actions",
       cell: ({ row }) => {
         const ganho = row.original;
-
         return (
           <div className="flex items-center gap-2">
             <Button
@@ -175,9 +167,9 @@ export default function GanhosPage() {
     },
   ];
 
-  const totalGanhos = filteredGanhos.reduce(
-    (acc, ganho) => acc + ganho.value,
-    0
+  const totalGanhos = useMemo(() => 
+    filteredGanhos.reduce((acc, ganho) => acc + ganho.value, 0),
+    [filteredGanhos]
   );
 
   return (
@@ -185,7 +177,8 @@ export default function GanhosPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Ganhos</h1>
         <div className="flex flex-col sm:flex-row gap-4">
-          <DateRangePicker date={dateRange} onDateChange={handleDateChange} />
+          {/* 3. Simplificado o DateRangePicker para passar apenas onDateChange */}
+          <DateRangePicker onDateChange={setDateRange} />
           <Button
             onClick={() => {
               setSelectedGanho(null);
@@ -246,7 +239,7 @@ export default function GanhosPage() {
             columns={columns}
             data={filteredGanhos}
             searchColumn="name"
-            searchPlaceholder="Filtrar por descrição..."
+            searchPlaceholder="Filtrar por nome..."
           />
         </CardContent>
       </Card>

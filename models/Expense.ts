@@ -8,10 +8,10 @@ export interface Expense {
   description?: string;
   value: number;
   creationDate: string;
-  /** Representa o objeto Category populado no frontend. A API pode retornar um categoryId. */
+  vencimento: string; // Novo campo
+  lastUpdate?: string; // Novo campo
   category: Category | null;
-  /** O ID da categoria como retornado pela API, usado para popular o objeto 'category'. */
-  categoryId?: number; // Adicionado para manter o ID original da API
+  categoryId?: number;
   userId?: string;
   status: ExpenseStatus;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useData } from "@/contexts/data-context";
 import { Variants } from "framer-motion";
 import {
@@ -30,7 +30,6 @@ export default function DashboardPage() {
     Investments,
     Objectives,
     Categorys,
-    // Não precisamos mais das funções de fetch para o carregamento inicial aqui
   } = useData();
 
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
@@ -45,17 +44,20 @@ export default function DashboardPage() {
     objectives: 0,
   });
 
-  // Função intermediária para garantir que from e to não são undefined
   function handleDateChange(range: { from?: Date; to?: Date }) {
     if (range.from && range.to) {
       setDateRange({ from: range.from, to: range.to });
     }
   }
 
-  const filteredExpenses = Expenses.filter((expense) => {
-    const date = new Date(expense.creationDate);
-    return date >= dateRange.from && date <= dateRange.to;
-  });
+  const filteredExpenses = useMemo(() => {
+    return Expenses.filter((expense) => {
+      // CORREÇÃO: Usa 'vencimento' ou 'creationDate' como fallback
+      const dateToFilter = new Date(expense.vencimento || expense.creationDate);
+      if (!dateRange.from || !dateRange.to) return true;
+      return dateToFilter >= dateRange.from && dateToFilter <= dateRange.to;
+    });
+  }, [Expenses, dateRange]);
 
   const getCategoryName = (categoryId: number | string | undefined) => {
     if (!categoryId) return "Sem categoria";
@@ -63,60 +65,70 @@ export default function DashboardPage() {
     return cat?.name ?? "Sem categoria";
   };
 
-  const expensesByCategory = filteredExpenses.reduce<Record<string, number>>(
-    (acc, expense) => {
-      const categoryId =
-        typeof expense.category === "object"
-          ? expense.category?.id
-          : expense.category;
-      const categoryName = getCategoryName(categoryId);
-      acc[categoryName] = (acc[categoryName] ?? 0) + expense.value;
-      return acc;
-    },
-    {}
+  const expensesByCategory = useMemo(() => 
+    filteredExpenses.reduce<Record<string, number>>(
+      (acc, expense) => {
+        const categoryId =
+          typeof expense.category === "object"
+            ? expense.category?.id
+            : expense.category;
+        const categoryName = getCategoryName(categoryId);
+        acc[categoryName] = (acc[categoryName] ?? 0) + expense.value;
+        return acc;
+      },
+      {}
+    ), [filteredExpenses, Categorys]
   );
 
-  // Filtrar dados pelo intervalo de datas
-  const filteredEarnings = Earnings.filter((earning) => {
-    const date = new Date(earning.creationDate);
-    return date >= dateRange.from && date <= dateRange.to;
-  });
+  const filteredEarnings = useMemo(() => {
+    return Earnings.filter((earning) => {
+      // CORREÇÃO: Usa 'recebimento' ou 'creationDate' como fallback
+      const dateToFilter = new Date(earning.recebimento || earning.creationDate);
+      if (!dateRange.from || !dateRange.to) return true;
+      return dateToFilter >= dateRange.from && dateToFilter <= dateRange.to;
+    });
+  }, [Earnings, dateRange]);
 
-  const filteredInvestments = Investments.filter((investment) => {
-    const date = new Date(investment.creation_date ?? investment.creation_date);
-    return date >= dateRange.from && date <= dateRange.to;
-  });
 
-  // Calcular totais
-  const totalEarnings = filteredEarnings.reduce(
-    (acc, earning) => acc + earning.value,
-    0
+  const filteredInvestments = useMemo(() => {
+    return Investments.filter((investment) => {
+      const date = new Date(investment.creation_date ?? investment.creation_date);
+      if (!dateRange.from || !dateRange.to) return true;
+      return date >= dateRange.from && date <= dateRange.to;
+    });
+  }, [Investments, dateRange]);
+
+  const totalEarnings = useMemo(() => 
+    filteredEarnings.reduce((acc, earning) => acc + earning.value, 0),
+    [filteredEarnings]
   );
-  const totalExpenses = filteredExpenses.reduce(
-    (acc, expense) => acc + expense.value,
-    0
-  );
-  const totalInvestments = filteredInvestments.reduce(
-    (acc, investment) => acc + investment.value,
-    0
-  );
-  const totalObjectives = Objectives.reduce(
-    (acc, obj) => acc + (obj.targetValue ?? 0),
-    0
+  
+  const totalExpenses = useMemo(() =>
+    filteredExpenses.reduce((acc, expense) => acc + expense.value, 0),
+    [filteredExpenses]
   );
 
-  // Comparações com período anterior
+  const totalInvestments = useMemo(() => 
+    filteredInvestments.reduce((acc, investment) => acc + investment.value, 0),
+    [filteredInvestments]
+  );
+  
+  const totalObjectives = useMemo(() =>
+    Objectives.reduce((acc, obj) => acc + (obj.target ?? 0), 0),
+    [Objectives]
+  );
+
   useEffect(() => {
     const duration = dateRange.to.getTime() - dateRange.from.getTime();
     const prevPeriodEnd = new Date(dateRange.from);
     const prevPeriodStart = new Date(prevPeriodEnd.getTime() - duration);
 
     const prevEarnings = Earnings.filter((earning) => {
-      const date = new Date(earning.creationDate);
+      const date = new Date(earning.recebimento || earning.creationDate);
       return date >= prevPeriodStart && date < prevPeriodEnd;
     });
     const prevExpenses = Expenses.filter((expense) => {
-      const date = new Date(expense.creationDate);
+      const date = new Date(expense.vencimento || expense.creationDate);
       return date >= prevPeriodStart && date < prevPeriodEnd;
     });
     const prevInvestments = Investments.filter((investment) => {
@@ -158,24 +170,23 @@ export default function DashboardPage() {
     Earnings,
     Expenses,
     Investments,
-    Objectives,
     totalEarnings,
     totalExpenses,
     totalInvestments,
   ]);
 
-  // Dados para gráficos
-  const expensesByDay = filteredExpenses.reduce<Record<string, number>>(
-    (acc, expense) => {
-      const day = new Date(expense.creationDate).toLocaleDateString("pt-BR");
-      acc[day] = (acc[day] ?? 0) + expense.value;
-      return acc;
-    },
-    {}
+  const expensesByDay = useMemo(() =>
+    filteredExpenses.reduce<Record<string, number>>(
+      (acc, expense) => {
+        const day = new Date(expense.vencimento || expense.creationDate).toLocaleDateString("pt-BR");
+        acc[day] = (acc[day] ?? 0) + expense.value;
+        return acc;
+      },
+      {}
+    ), [filteredExpenses]
   );
 
-  // Mostrar comparações se período for um mês completo e menor que 32 dias
-  const showComparisons = (() => {
+  const showComparisons = useMemo(() => {
     const isFullMonth =
       dateRange.from.getDate() === 1 &&
       dateRange.to.getDate() ===
@@ -189,181 +200,105 @@ export default function DashboardPage() {
         (1000 * 60 * 60 * 24) <
       32;
     return isFullMonth && isLessThan32Days;
-  })();
+  }, [dateRange]);
 
-  // Animação para cards
   const cardVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i: number = 1) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      delay: i * 0.1,
-      duration: 0.5,
-      ease: [0.42, 0, 0.58, 1] // Cubic bezier para easeInOut
-    }
-  })
-};
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number = 1) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: i * 0.1,
+        duration: 0.5,
+        ease: [0.42, 0, 0.58, 1]
+      }
+    })
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <DateRangePicker date={dateRange} onDateChange={handleDateChange} />
+        <DateRangePicker onDateChange={handleDateChange} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <motion.div
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          custom={0}
-        >
+        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={0}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total de Ganhos
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Total de Ganhos</CardTitle>
               <div className="rounded-full p-2 bg-green-100 dark:bg-green-900">
                 <ArrowUpIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(totalEarnings)}
-              </div>
+              <div className="text-2xl font-bold">{formatCurrency(totalEarnings)}</div>
               {showComparisons && (
                 <div className="flex items-center mt-1">
-                  <div
-                    className={`flex items-center ${
-                      comparisons.earnings >= 0
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-red-600 dark:text-red-400"
-                    }`}
-                  >
-                    {comparisons.earnings >= 0 ? (
-                      <ArrowUpIcon className="h-4 w-4 mr-1" />
-                    ) : (
-                      <ArrowDownIcon className="h-4 w-4 mr-1" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {Math.abs(comparisons.earnings).toFixed(1)}%
-                    </span>
+                  <div className={`flex items-center ${comparisons.earnings >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                    {comparisons.earnings >= 0 ? <ArrowUpIcon className="h-4 w-4 mr-1" /> : <ArrowDownIcon className="h-4 w-4 mr-1" />}
+                    <span className="text-sm font-medium">{Math.abs(comparisons.earnings).toFixed(1)}%</span>
                   </div>
-                  <span className="text-xs text-muted-foreground ml-1">
-                    vs. período anterior
-                  </span>
+                  <span className="text-xs text-muted-foreground ml-1">vs. período anterior</span>
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.div
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          custom={1}
-        >
+        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total de Gastos
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Total de Gastos</CardTitle>
               <div className="rounded-full p-2 bg-red-100 dark:bg-red-900">
                 <ArrowDownIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(totalExpenses)}
-              </div>
+              <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
               {showComparisons && (
                 <div className="flex items-center mt-1">
-                  <div
-                    className={`flex items-center ${
-                      comparisons.expenses <= 0
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-red-600 dark:text-red-400"
-                    }`}
-                  >
-                    {comparisons.expenses <= 0 ? (
-                      <ArrowDownIcon className="h-4 w-4 mr-1" />
-                    ) : (
-                      <ArrowUpIcon className="h-4 w-4 mr-1" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {Math.abs(comparisons.expenses).toFixed(1)}%
-                    </span>
+                  <div className={`flex items-center ${comparisons.expenses <= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                    {comparisons.expenses <= 0 ? <ArrowDownIcon className="h-4 w-4 mr-1" /> : <ArrowUpIcon className="h-4 w-4 mr-1" />}
+                    <span className="text-sm font-medium">{Math.abs(comparisons.expenses).toFixed(1)}%</span>
                   </div>
-                  <span className="text-xs text-muted-foreground ml-1">
-                    vs. período anterior
-                  </span>
+                  <span className="text-xs text-muted-foreground ml-1">vs. período anterior</span>
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.div
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          custom={2}
-        >
+        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={2}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Investimentos Ativos
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Investimentos Ativos</CardTitle>
               <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900">
                 <LineChartIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(totalInvestments)}
-              </div>
+              <div className="text-2xl font-bold">{formatCurrency(totalInvestments)}</div>
               {showComparisons && (
-                <p
-                  className={`text-xs ${
-                    comparisons.investments >= 0
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
-                >
-                  {comparisons.investments >= 0 ? "+" : ""}
-                  {comparisons.investments}% em relação ao período anterior
+                <p className={`text-xs ${comparisons.investments >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {comparisons.investments >= 0 ? "+" : ""}{comparisons.investments}% em relação ao período anterior
                 </p>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.div
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          custom={3}
-        >
+        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={3}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Saldo em Conta
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Saldo em Conta</CardTitle>
               <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900">
                 <BanknoteIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(
-                  totalEarnings - (totalExpenses + totalInvestments)
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Valor restante dos ganhos
-              </p>
+              <div className="text-2xl font-bold">{formatCurrency(totalEarnings - (totalExpenses + totalInvestments))}</div>
+              <p className="text-xs text-muted-foreground">Valor restante dos ganhos</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -379,36 +314,19 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Gastos por Categoria</CardTitle>
-                <CardDescription>
-                  Distribuição dos seus gastos por categoria no período
-                  selecionado
-                </CardDescription>
+                <CardDescription>Distribuição dos seus gastos por categoria no período selecionado</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <PieChart
-                  data={Object.entries(expensesByCategory).map(
-                    ([name, value]) => ({
-                      name,
-                      value,
-                    })
-                  )}
-                />
+                <PieChart data={Object.entries(expensesByCategory).map(([name, value]) => ({ name, value }))} />
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
                 <CardTitle>Gastos por Dia</CardTitle>
-                <CardDescription>
-                  Evolução dos seus gastos diários no período selecionado
-                </CardDescription>
+                <CardDescription>Evolução dos seus gastos diários no período selecionado</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <BarChart
-                  data={Object.entries(expensesByDay).map(([date, value]) => ({
-                    date,
-                    value,
-                  }))}
-                />
+                <BarChart data={Object.entries(expensesByDay).map(([date, value]) => ({ date, value }))} />
               </CardContent>
             </Card>
           </div>
@@ -426,28 +344,17 @@ export default function DashboardPage() {
                 {filteredEarnings.length > 0 ? (
                   <ul className="space-y-2">
                     {filteredEarnings.slice(0, 5).map((earning) => (
-                      <li
-                        key={earning.id}
-                        className="flex justify-between items-center p-2 rounded-md hover:bg-muted"
-                      >
+                      <li key={earning.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted">
                         <div>
                           <p className="font-medium">{earning.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(earning.creationDate).toLocaleDateString(
-                              "pt-BR"
-                            )}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{new Date(earning.recebimento || earning.creationDate).toLocaleDateString("pt-BR")}</p>
                         </div>
-                        <span className="font-semibold text-green-600 dark:text-green-400">
-                          {formatCurrency(earning.value)}
-                        </span>
+                        <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(earning.value)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground text-center py-4">
-                    Nenhum ganho no período selecionado
-                  </p>
+                  <p className="text-muted-foreground text-center py-4">Nenhum ganho no período selecionado</p>
                 )}
               </CardContent>
             </Card>
@@ -462,29 +369,20 @@ export default function DashboardPage() {
                 {filteredExpenses.length > 0 ? (
                   <ul className="space-y-2">
                     {filteredExpenses.slice(0, 5).map((expense) => (
-                      <li
-                        key={expense.id}
-                        className="flex justify-between items-center p-2 rounded-md hover:bg-muted"
-                      >
+                      <li key={expense.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted">
                         <div>
                           <p className="font-medium">{expense.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {expense.category?.toString() || "Sem categoria"} •{" "}
-                            {new Date(expense.creationDate).toLocaleDateString(
-                              "pt-BR"
-                            )}
+                            {getCategoryName(typeof expense.category === "object" ? expense.category?.id : expense.category)} •{" "}
+                            {new Date(expense.vencimento || expense.creationDate).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
-                        <span className="font-semibold text-red-600 dark:text-red-400">
-                          {formatCurrency(expense.value)}
-                        </span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(expense.value)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground text-center py-4">
-                    Nenhum gasto no período selecionado
-                  </p>
+                  <p className="text-muted-foreground text-center py-4">Nenhum gasto no período selecionado</p>
                 )}
               </CardContent>
             </Card>

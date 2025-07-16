@@ -17,7 +17,12 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
+import { Calendar as CalendarIcon, Loader2 } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { cn } from "@/lib/utils"
 
 interface GanhoDialogProps {
   open: boolean
@@ -34,7 +39,8 @@ export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
   const [description, setDescription] = useState("")
   const [value, setValue] = useState("")
   const [wage, setWage] = useState(false)
-  const [date, setDate] = useState<Date>(new Date())
+  // 1. Alterado 'date' para 'recebimento' para corresponder ao backend
+  const [recebimento, setRecebimento] = useState<Date | undefined>(new Date())
 
   useEffect(() => {
     if (open) {
@@ -43,13 +49,14 @@ export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
         setDescription(ganho.description ?? "")
         setValue(ganho.value.toString())
         setWage(ganho.wage)
-        setDate(new Date(ganho.creationDate))
+        // 2. Usar o novo campo 'recebimento' do modelo Earning
+        setRecebimento(ganho.recebimento ? new Date(ganho.recebimento) : new Date())
       } else {
         setName("")
         setDescription("")
         setValue("")
         setWage(false)
-        setDate(new Date())
+        setRecebimento(new Date())
       }
     }
   }, [open, ganho])
@@ -69,12 +76,13 @@ export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
     setLoading(true)
 
     try {
+      // 3. Enviar o campo 'recebimento' no formato correto
       const ganhoData = {
         name,
         description,
         value: Number.parseFloat(value),
         wage,
-        creationDate: date.toISOString(),
+        recebimento: recebimento ? format(recebimento, "yyyy-MM-dd'T'HH:mm:ss") : new Date().toISOString(),
       }
 
       if (ganho) {
@@ -84,7 +92,7 @@ export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
           description: "O ganho foi atualizado com sucesso.",
         })
       } else {
-        await addEarning(ganhoData)
+        await addEarning(ganhoData as Omit<Earning, "id">)
         toast({
           title: "Ganho adicionado",
           description: "O ganho foi adicionado com sucesso.",
@@ -149,6 +157,21 @@ export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
                 placeholder="0,00"
                 required
               />
+            </div>
+            {/* 4. Adicionar o seletor de data para o recebimento */}
+            <div className="grid gap-2">
+              <Label htmlFor="recebimento">Data de Recebimento</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !recebimento && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {recebimento ? format(recebimento, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={recebimento} onSelect={setRecebimento} initialFocus />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="flex items-center gap-2">
               <Switch id="wage" checked={wage} onCheckedChange={setWage} />

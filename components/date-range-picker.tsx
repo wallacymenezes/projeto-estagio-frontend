@@ -1,129 +1,116 @@
 "use client"
 
 import * as React from "react"
-import { format } from "date-fns"
+import { format, addMonths, startOfMonth, endOfMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon } from "lucide-react"
 import type { DateRange } from "react-day-picker"
-export type { DateRange }
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState } from "react"
+
+export type { DateRange }
+
+interface MonthOption {
+  value: string;
+  label: string;
+}
 
 interface DateRangePickerProps {
-  date: DateRange
+  // A prop 'date' não é mais necessária, mas mantemos onDateChange
   onDateChange: (date: DateRange) => void
   className?: string
 }
 
-export function DateRangePicker({ date, onDateChange, className }: DateRangePickerProps) {
-  const [isOpen, setIsOpen] = React.useState(false)
+export function DateRangePicker({ onDateChange, className }: DateRangePickerProps) {
+  
+  // Gera dinamicamente as opções de mês
+  const monthOptions = React.useMemo(() => {
+    const today = new Date();
+    const options: MonthOption[] = [
+      { value: "thisMonth", label: "Este mês" },
+      { value: "nextMonth", label: "Próximo mês" },
+      { value: "lastMonth", label: "Mês passado" },
+    ];
 
-  // Predefined date ranges
-  const handleSelectPredefined = (value: string) => {
+    // Adiciona os próximos 4 meses (Setembro, Outubro, Novembro, etc.)
+    for (let i = 3; i <= 5; i++) {
+      const futureMonth = addMonths(today, i - 1);
+      const monthLabel = format(futureMonth, 'MMMM', { locale: ptBR });
+      options.push({
+        value: format(futureMonth, 'yyyy-MM'), // ex: "2025-09"
+        // Capitaliza a primeira letra do mês
+        label: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
+      });
+    }
+    
+    options.push({ value: "thisYear", label: "Este ano" });
+
+    return options;
+  }, []);
+  
+  const [selectedValue, setSelectedValue] = useState("thisMonth");
+
+  const handleValueChange = (value: string) => {
     const today = new Date()
     let from: Date
-    let to: Date = today
+    let to: Date
+    
+    setSelectedValue(value);
 
-    switch (value) {
-      case "today":
-        from = today
-        break
-      case "yesterday": {
-        const yesterday = new Date()
-        yesterday.setDate(yesterday.getDate() - 1)
-        from = yesterday
-        to = yesterday
-        break
+    // Verifica se o valor é um mês específico (ex: "2025-09")
+    if (value.match(/^\d{4}-\d{2}$/)) {
+      const [year, month] = value.split('-').map(Number);
+      from = startOfMonth(new Date(year, month - 1));
+      to = endOfMonth(new Date(year, month - 1));
+    } else {
+      // Lida com os casos fixos
+      switch (value) {
+        case "thisMonth":
+          from = startOfMonth(today);
+          to = endOfMonth(today);
+          break;
+        case "nextMonth":
+          const nextMonthDate = addMonths(today, 1);
+          from = startOfMonth(nextMonthDate);
+          to = endOfMonth(nextMonthDate);
+          break;
+        case "lastMonth":
+          const lastMonthDate = addMonths(today, -1);
+          from = startOfMonth(lastMonthDate);
+          to = endOfMonth(lastMonthDate);
+          break;
+        case "thisYear":
+          from = new Date(today.getFullYear(), 0, 1);
+          to = new Date(today.getFullYear(), 11, 31);
+          break;
+        default:
+          return;
       }
-      case "last7days":
-        from = new Date()
-        from.setDate(from.getDate() - 6)
-        break
-      case "last30days":
-        from = new Date()
-        from.setDate(from.getDate() - 29)
-        break
-      case "thisMonth":
-        from = new Date(today.getFullYear(), today.getMonth(), 1)
-        to = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-        break
-      case "lastMonth": {
-        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1)
-        from = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1)
-        to = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0)
-        break
-      }
-      case "thisYear":
-        from = new Date(today.getFullYear(), 0, 1)
-        to = new Date(today.getFullYear(), 11, 31)
-        break
-      default:
-        return
     }
 
-    onDateChange({ from, to })
+    onDateChange({ from, to });
   }
 
+  // Define o valor inicial para "Este mês" na primeira renderização
+  React.useEffect(() => {
+    handleValueChange("thisMonth");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <div className={cn("grid gap-2", className)}>
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            id="date"
-            variant={"outline"}
-            className={cn("w-full justify-start text-left font-normal md:w-auto", !date && "text-muted-foreground")}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date?.from ? (
-              date.to ? (
-                <>
-                  {format(date.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
-                  {format(date.to, "dd/MM/yyyy", { locale: ptBR })}
-                </>
-              ) : (
-                format(date.from, "dd/MM/yyyy", { locale: ptBR })
-              )
-            ) : (
-              <span>Selecione um período</span>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="p-3 border-b">
-            <Select onValueChange={handleSelectPredefined}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um período" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Hoje</SelectItem>
-                <SelectItem value="yesterday">Ontem</SelectItem>
-                <SelectItem value="last7days">Últimos 7 dias</SelectItem>
-                <SelectItem value="last30days">Últimos 30 dias</SelectItem>
-                <SelectItem value="thisMonth">Este mês</SelectItem>
-                <SelectItem value="lastMonth">Mês passado</SelectItem>
-                <SelectItem value="thisYear">Este ano</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={(date) => {
-              onDateChange(date || { from: new Date(), to: new Date() })
-              if (date?.from && date?.to) {
-                setIsOpen(false)
-              }
-            }}
-            numberOfMonths={2}
-            locale={ptBR}
-          />
-        </PopoverContent>
-      </Popover>
+    <div className={className}>
+      <Select value={selectedValue} onValueChange={handleValueChange}>
+        <SelectTrigger className="w-full md:w-[180px]">
+          <SelectValue placeholder="Selecione um período" />
+        </SelectTrigger>
+        <SelectContent>
+          {monthOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   )
 }

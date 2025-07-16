@@ -1,4 +1,3 @@
-// wallacymenezes/projeto-estagio-frontend/projeto-estagio-frontend-d0eaefe2ab734cdf8502a055fd12d3c722944237/components/despesa-dialog.tsx
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -17,9 +16,15 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
+import { CalendarIcon, Loader2 } from "lucide-react"
 import type { Expense, ExpenseStatus } from "@/models/Expense"
 import type { Category } from "@/models/Category"
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
+import { Calendar } from "./ui/calendar"
+import { ptBR } from "date-fns/locale"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+
 
 interface DespesaDialogProps {
   open: boolean
@@ -38,6 +43,8 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
   const [value, setValue] = useState("")
   const [category, setCategory] = useState<Category | null>(null)
   const [status, setStatus] = useState<ExpenseStatus>("PENDING")
+  const [vencimento, setVencimento] = useState<Date | undefined>(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -47,12 +54,14 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
         setValue(despesa.value.toString())
         setCategory(despesa.category)
         setStatus(despesa.status || "PENDING")
+        setVencimento(despesa.vencimento ? new Date(despesa.vencimento) : new Date());
       } else {
         setName("")
         setDescription("")
         setValue("")
         setCategory(null)
         setStatus("PENDING")
+        setVencimento(new Date());
       }
     }
   }, [open, despesa])
@@ -81,27 +90,23 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
     setLoading(true)
 
     try {
-      // O DataContext espera o objeto Category completo aqui.
       const despesaDataPayload = {
         name,
         description,
         value: Number.parseFloat(value),
-        category: category, // CORREÇÃO: Passar o objeto Category completo
+        category: category,
         status,
-        // userId é adicionado no DataContext
+        // CORREÇÃO: Formatar a data para YYYY-MM-DD
+        vencimento: vencimento ? format(vencimento, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
       };
 
       if (despesa) {
-        // A tipagem de updateExpense no DataContext espera Partial<Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">>
-        // e category será o objeto.
         await updateExpense(despesa.id, despesaDataPayload as Partial<Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">>);
         toast({
           title: "Despesa atualizada",
           description: "A despesa foi atualizada com sucesso.",
         })
       } else {
-        // A tipagem de addExpense no DataContext espera Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">
-        // e category será o objeto.
         await addExpense(despesaDataPayload as Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">);
         toast({
           title: "Despesa adicionada",
@@ -170,6 +175,28 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
                 placeholder="0,00"
                 required
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vencimento">Data de Vencimento</Label>
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !vencimento && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {vencimento ? format(vencimento, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={vencimento}
+                    onSelect={(date) => {
+                      setVencimento(date)
+                      setIsCalendarOpen(false)
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="category">Categoria</Label>

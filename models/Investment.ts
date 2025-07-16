@@ -1,3 +1,5 @@
+import type { Objective } from "./Objective";
+
 export interface Investment {
   id: number;
   name: string;
@@ -5,8 +7,10 @@ export interface Investment {
   percentage: number;
   months: number;
   creation_date: string;
+  lastUpdate?: string; // Novo campo
   value: number;
-  investmentType: string;
-  objectiveId?: number;
-  userId?: string; // id do usuário dono do investimento
+  investmentType: "TESOURO" | "FIIS" | "ACOES" | "POUPANCA" | "CDI" | "CRYPTO";
+  objectiveId?: number | null;
+  objective?: Objective | null;
+  userId?: string;
 }
