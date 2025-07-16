@@ -18,6 +18,7 @@ import { Category } from "@/models/Category";
 import { atualizar, buscar, register, deletar } from "@/Service/Service";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "./auth-context";
+import type { DateRange } from "react-day-picker";
 
 interface BackendExpenseData {
   id: number;
@@ -80,6 +81,8 @@ interface DataContextType {
     category: Partial<Omit<Category, "id">>
   ) => Promise<Category | undefined>;
   deleteCategory: (id: number) => Promise<void>;
+  dateRange: DateRange;
+  setDateRange: (dateRange: DateRange) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -95,7 +98,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [Investments, setInvestments] = useState<Investment[]>([]);
   const [Objectives, setObjectives] = useState<Objective[]>([]);
   const [Categorys, setCategorys] = useState<Category[]>([]);
-
+  
   useEffect(() => {
     // Só executa quando a autenticação terminar e tivermos um usuário válido
     if (!authLoading && userId && token) {
@@ -520,6 +523,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
+  });
+
   return (
     <DataContext.Provider
       value={{
@@ -549,6 +557,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         addCategory,
         updateCategory,
         deleteCategory,
+        dateRange,
+        setDateRange,
       }}
     >
       {children}

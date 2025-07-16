@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DateRangePicker } from "@/components/date-range-picker";
+import { DateRangePicker, type DateRange } from "@/components/date-range-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, PieChart } from "@/components/charts";
 import { formatCurrency } from "@/lib/utils";
@@ -30,176 +30,100 @@ export default function DashboardPage() {
     Investments,
     Objectives,
     Categorys,
+    // 1. Obter o estado do filtro e a função para atualizá-lo do contexto
+    dateRange,
+    setDateRange,
   } = useData();
-
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
-  });
 
   const [comparisons, setComparisons] = useState({
     earnings: 0,
     expenses: 0,
     investments: 0,
-    objectives: 0,
   });
 
-  function handleDateChange(range: { from?: Date; to?: Date }) {
-    if (range.from && range.to) {
-      setDateRange({ from: range.from, to: range.to });
-    }
-  }
-
+  // 2. Filtros de dados agora verificam se dateRange e suas propriedades existem
   const filteredExpenses = useMemo(() => {
+    if (!Expenses || !dateRange?.from || !dateRange?.to) return [];
     return Expenses.filter((expense) => {
-      // CORREÇÃO: Usa 'vencimento' ou 'creationDate' como fallback
       const dateToFilter = new Date(expense.vencimento || expense.creationDate);
-      if (!dateRange.from || !dateRange.to) return true;
-      return dateToFilter >= dateRange.from && dateToFilter <= dateRange.to;
+      return dateToFilter >= dateRange.from! && dateToFilter <= dateRange.to!;
     });
   }, [Expenses, dateRange]);
 
-  const getCategoryName = (categoryId: number | string | undefined) => {
-    if (!categoryId) return "Sem categoria";
-    const cat = Categorys.find((c) => c.id === categoryId);
-    return cat?.name ?? "Sem categoria";
-  };
-
-  const expensesByCategory = useMemo(() => 
-    filteredExpenses.reduce<Record<string, number>>(
-      (acc, expense) => {
-        const categoryId =
-          typeof expense.category === "object"
-            ? expense.category?.id
-            : expense.category;
-        const categoryName = getCategoryName(categoryId);
-        acc[categoryName] = (acc[categoryName] ?? 0) + expense.value;
-        return acc;
-      },
-      {}
-    ), [filteredExpenses, Categorys]
-  );
-
   const filteredEarnings = useMemo(() => {
+    if (!Earnings || !dateRange?.from || !dateRange?.to) return [];
     return Earnings.filter((earning) => {
-      // CORREÇÃO: Usa 'recebimento' ou 'creationDate' como fallback
       const dateToFilter = new Date(earning.recebimento || earning.creationDate);
-      if (!dateRange.from || !dateRange.to) return true;
-      return dateToFilter >= dateRange.from && dateToFilter <= dateRange.to;
+      return dateToFilter >= dateRange.from! && dateToFilter <= dateRange.to!;
     });
   }, [Earnings, dateRange]);
 
-
   const filteredInvestments = useMemo(() => {
+    if (!Investments || !dateRange?.from || !dateRange?.to) return [];
     return Investments.filter((investment) => {
-      const date = new Date(investment.creation_date ?? investment.creation_date);
-      if (!dateRange.from || !dateRange.to) return true;
-      return date >= dateRange.from && date <= dateRange.to;
+      const date = new Date(investment.creation_date);
+      return date >= dateRange.from! && date <= dateRange.to!;
     });
   }, [Investments, dateRange]);
-
-  const totalEarnings = useMemo(() => 
-    filteredEarnings.reduce((acc, earning) => acc + earning.value, 0),
-    [filteredEarnings]
-  );
   
-  const totalExpenses = useMemo(() =>
-    filteredExpenses.reduce((acc, expense) => acc + expense.value, 0),
-    [filteredExpenses]
-  );
+  // 3. Cálculos de totais e gráficos com useMemo para performance
+  const totalEarnings = useMemo(() => filteredEarnings.reduce((acc, e) => acc + e.value, 0), [filteredEarnings]);
+  const totalExpenses = useMemo(() => filteredExpenses.reduce((acc, e) => acc + e.value, 0), [filteredExpenses]);
+  const totalInvestments = useMemo(() => filteredInvestments.reduce((acc, i) => acc + i.value, 0), [filteredInvestments]);
+  const totalDespesasPagas = useMemo(() => filteredExpenses.filter(e => e.status === "PAID").reduce((acc, e) => acc + e.value, 0), [filteredExpenses]);
+  const saldoEmConta = useMemo(() => totalEarnings - totalDespesasPagas - totalInvestments, [totalEarnings, totalDespesasPagas, totalInvestments]);
 
-  const totalInvestments = useMemo(() => 
-    filteredInvestments.reduce((acc, investment) => acc + investment.value, 0),
-    [filteredInvestments]
-  );
-  
-  const totalObjectives = useMemo(() =>
-    Objectives.reduce((acc, obj) => acc + (obj.target ?? 0), 0),
-    [Objectives]
-  );
+  const expensesByCategory = useMemo(() => 
+    filteredExpenses.reduce<Record<string, number>>((acc, expense) => {
+      const categoryName = expense.category?.name || "Sem categoria";
+      acc[categoryName] = (acc[categoryName] ?? 0) + expense.value;
+      return acc;
+    }, {}), 
+  [filteredExpenses]);
 
+  const expensesByDay = useMemo(() =>
+    filteredExpenses.reduce<Record<string, number>>((acc, expense) => {
+        const day = new Date(expense.vencimento || expense.creationDate).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
+        acc[day] = (acc[day] ?? 0) + expense.value;
+        return acc;
+      }, {}), 
+  [filteredExpenses]);
+
+
+  // 4. Cálculo de comparações com o período anterior
   useEffect(() => {
+    if (!dateRange?.from || !dateRange?.to) return;
+
     const duration = dateRange.to.getTime() - dateRange.from.getTime();
+    if (duration <= 0) return;
+    
     const prevPeriodEnd = new Date(dateRange.from);
     const prevPeriodStart = new Date(prevPeriodEnd.getTime() - duration);
 
-    const prevEarnings = Earnings.filter((earning) => {
-      const date = new Date(earning.recebimento || earning.creationDate);
+    const prevEarningsTotal = Earnings.filter(e => {
+      const date = new Date(e.recebimento || e.creationDate);
       return date >= prevPeriodStart && date < prevPeriodEnd;
-    });
-    const prevExpenses = Expenses.filter((expense) => {
-      const date = new Date(expense.vencimento || expense.creationDate);
-      return date >= prevPeriodStart && date < prevPeriodEnd;
-    });
-    const prevInvestments = Investments.filter((investment) => {
-      const date = new Date(
-        investment.creation_date ?? investment.creation_date
-      );
-      return date >= prevPeriodStart && date < prevPeriodEnd;
-    });
+    }).reduce((acc, e) => acc + e.value, 0);
 
-    const prevTotalEarnings = prevEarnings.reduce((acc, e) => acc + e.value, 0);
-    const prevTotalExpenses = prevExpenses.reduce((acc, e) => acc + e.value, 0);
-    const prevTotalInvestments = prevInvestments.reduce(
-      (acc, e) => acc + e.value,
-      0
-    );
+    const prevExpensesTotal = Expenses.filter(e => {
+      const date = new Date(e.vencimento || e.creationDate);
+      return date >= prevPeriodStart && date < prevPeriodEnd;
+    }).reduce((acc, e) => acc + e.value, 0);
 
-    const earningsComparison =
-      prevTotalEarnings === 0
-        ? 100
-        : ((totalEarnings - prevTotalEarnings) / prevTotalEarnings) * 100;
-    const expensesComparison =
-      prevTotalExpenses === 0
-        ? 0
-        : ((totalExpenses - prevTotalExpenses) / prevTotalExpenses) * 100;
-    const investmentsComparison =
-      prevTotalInvestments === 0
-        ? 100
-        : ((totalInvestments - prevTotalInvestments) / prevTotalInvestments) *
-          100;
+    const earningsComparison = prevEarningsTotal === 0 ? (totalEarnings > 0 ? 100 : 0) : ((totalEarnings - prevEarningsTotal) / prevEarningsTotal) * 100;
+    const expensesComparison = prevExpensesTotal === 0 ? (totalExpenses > 0 ? 100 : 0) : ((totalExpenses - prevExpensesTotal) / prevExpensesTotal) * 100;
 
     setComparisons({
-      earnings: Number(earningsComparison.toFixed(2)),
-      expenses: Number(expensesComparison.toFixed(2)),
-      investments: Number(investmentsComparison.toFixed(2)),
-      objectives: 0,
+      earnings: Number(earningsComparison.toFixed(1)),
+      expenses: Number(expensesComparison.toFixed(1)),
+      investments: 0, // Lógica para investimentos pode ser adicionada aqui
     });
-  }, [
-    dateRange,
-    Earnings,
-    Expenses,
-    Investments,
-    totalEarnings,
-    totalExpenses,
-    totalInvestments,
-  ]);
-
-  const expensesByDay = useMemo(() =>
-    filteredExpenses.reduce<Record<string, number>>(
-      (acc, expense) => {
-        const day = new Date(expense.vencimento || expense.creationDate).toLocaleDateString("pt-BR");
-        acc[day] = (acc[day] ?? 0) + expense.value;
-        return acc;
-      },
-      {}
-    ), [filteredExpenses]
-  );
+  }, [dateRange, Earnings, Expenses, totalEarnings, totalExpenses]);
 
   const showComparisons = useMemo(() => {
-    const isFullMonth =
-      dateRange.from.getDate() === 1 &&
-      dateRange.to.getDate() ===
-        new Date(
-          dateRange.to.getFullYear(),
-          dateRange.to.getMonth() + 1,
-          0
-        ).getDate();
-    const isLessThan32Days =
-      (dateRange.to.getTime() - dateRange.from.getTime()) /
-        (1000 * 60 * 60 * 24) <
-      32;
-    return isFullMonth && isLessThan32Days;
+    if (!dateRange?.from || !dateRange?.to) return false;
+    const durationDays = (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24);
+    return durationDays > 27 && durationDays < 32;
   }, [dateRange]);
 
   const cardVariants: Variants = {
@@ -207,11 +131,7 @@ export default function DashboardPage() {
     visible: (i: number = 1) => ({
       opacity: 1,
       y: 0,
-      transition: {
-        delay: i * 0.1,
-        duration: 0.5,
-        ease: [0.42, 0, 0.58, 1]
-      }
+      transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" }
     })
   };
 
@@ -219,86 +139,78 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <DateRangePicker onDateChange={handleDateChange} />
+        <DateRangePicker onDateChange={(range) => range && setDateRange(range)} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {/* Card Total de Ganhos */}
         <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={0}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total de Ganhos</CardTitle>
-              <div className="rounded-full p-2 bg-green-100 dark:bg-green-900">
-                <ArrowUpIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
+              <ArrowUpIcon className="h-5 w-5 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalEarnings)}</div>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalEarnings)}</div>
               {showComparisons && (
-                <div className="flex items-center mt-1">
-                  <div className={`flex items-center ${comparisons.earnings >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    {comparisons.earnings >= 0 ? <ArrowUpIcon className="h-4 w-4 mr-1" /> : <ArrowDownIcon className="h-4 w-4 mr-1" />}
-                    <span className="text-sm font-medium">{Math.abs(comparisons.earnings).toFixed(1)}%</span>
+                <div className="flex items-center mt-1 text-xs">
+                  <div className={`flex items-center ${comparisons.earnings >= 0 ? "text-green-500" : "text-red-500"}`}>
+                    {comparisons.earnings >= 0 ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />}
+                    <span>{Math.abs(comparisons.earnings)}%</span>
                   </div>
-                  <span className="text-xs text-muted-foreground ml-1">vs. período anterior</span>
+                  <span className="text-muted-foreground ml-1">vs. mês anterior</span>
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
+        {/* Card Total de Gastos */}
         <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total de Gastos</CardTitle>
-              <div className="rounded-full p-2 bg-red-100 dark:bg-red-900">
-                <ArrowDownIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
-              </div>
+              <ArrowDownIcon className="h-5 w-5 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrency(totalExpenses)}</div>
               {showComparisons && (
-                <div className="flex items-center mt-1">
-                  <div className={`flex items-center ${comparisons.expenses <= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    {comparisons.expenses <= 0 ? <ArrowDownIcon className="h-4 w-4 mr-1" /> : <ArrowUpIcon className="h-4 w-4 mr-1" />}
-                    <span className="text-sm font-medium">{Math.abs(comparisons.expenses).toFixed(1)}%</span>
+                <div className="flex items-center mt-1 text-xs">
+                  <div className={`flex items-center ${comparisons.expenses <= 0 ? "text-green-500" : "text-red-500"}`}>
+                    {comparisons.expenses <= 0 ? <ArrowDownIcon className="h-4 w-4" /> : <ArrowUpIcon className="h-4 w-4" />}
+                    <span>{Math.abs(comparisons.expenses)}%</span>
                   </div>
-                  <span className="text-xs text-muted-foreground ml-1">vs. período anterior</span>
+                  <span className="text-muted-foreground ml-1">vs. mês anterior</span>
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
+        {/* Card Investimentos Ativos */}
         <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={2}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Investimentos Ativos</CardTitle>
-              <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900">
-                <LineChartIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalInvestments)}</div>
-              {showComparisons && (
-                <p className={`text-xs ${comparisons.investments >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                  {comparisons.investments >= 0 ? "+" : ""}{comparisons.investments}% em relação ao período anterior
-                </p>
-              )}
-            </CardContent>
-          </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Investimentos Ativos</CardTitle>
+                    <LineChartIcon className="h-5 w-5 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(totalInvestments)}</div>
+                     <p className="text-xs text-muted-foreground">total aplicado no período</p>
+                </CardContent>
+            </Card>
         </motion.div>
 
+        {/* Card Saldo em Conta */}
         <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={3}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Saldo em Conta</CardTitle>
-              <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900">
-                <BanknoteIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
+              <BanknoteIcon className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalEarnings - (totalExpenses + totalInvestments))}</div>
-              <p className="text-xs text-muted-foreground">Valor restante dos ganhos</p>
+              <div className={`text-2xl font-bold ${saldoEmConta >= 0 ? '' : 'text-red-500'}`}>{formatCurrency(saldoEmConta)}</div>
+              <p className="text-xs text-muted-foreground">Ganhos - Despesas Pagas - Investimentos</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -314,7 +226,6 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Gastos por Categoria</CardTitle>
-                <CardDescription>Distribuição dos seus gastos por categoria no período selecionado</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
                 <PieChart data={Object.entries(expensesByCategory).map(([name, value]) => ({ name, value }))} />
@@ -323,7 +234,6 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Gastos por Dia</CardTitle>
-                <CardDescription>Evolução dos seus gastos diários no período selecionado</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
                 <BarChart data={Object.entries(expensesByDay).map(([date, value]) => ({ date, value }))} />
@@ -335,10 +245,7 @@ export default function DashboardPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BanknoteIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <span>Últimos Ganhos</span>
-                </CardTitle>
+                <CardTitle className="flex items-center gap-2"><BanknoteIcon className="h-5 w-5 text-green-500" /><span>Últimos Ganhos</span></CardTitle>
               </CardHeader>
               <CardContent>
                 {filteredEarnings.length > 0 ? (
@@ -349,21 +256,18 @@ export default function DashboardPage() {
                           <p className="font-medium">{earning.name}</p>
                           <p className="text-xs text-muted-foreground">{new Date(earning.recebimento || earning.creationDate).toLocaleDateString("pt-BR")}</p>
                         </div>
-                        <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(earning.value)}</span>
+                        <span className="font-semibold text-green-500">{formatCurrency(earning.value)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground text-center py-4">Nenhum ganho no período selecionado</p>
+                  <p className="text-muted-foreground text-center py-4">Nenhum ganho no período</p>
                 )}
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CoinsIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
-                  <span>Últimos Gastos</span>
-                </CardTitle>
+                <CardTitle className="flex items-center gap-2"><CoinsIcon className="h-5 w-5 text-red-500" /><span>Últimos Gastos</span></CardTitle>
               </CardHeader>
               <CardContent>
                 {filteredExpenses.length > 0 ? (
@@ -373,16 +277,15 @@ export default function DashboardPage() {
                         <div>
                           <p className="font-medium">{expense.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {getCategoryName(typeof expense.category === "object" ? expense.category?.id : expense.category)} •{" "}
-                            {new Date(expense.vencimento || expense.creationDate).toLocaleDateString("pt-BR")}
+                            {expense.category?.name || "Sem categoria"} • {new Date(expense.vencimento || expense.creationDate).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
-                        <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(expense.value)}</span>
+                        <span className="font-semibold text-red-500">{formatCurrency(expense.value)}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground text-center py-4">Nenhum gasto no período selecionado</p>
+                  <p className="text-muted-foreground text-center py-4">Nenhum gasto no período</p>
                 )}
               </CardContent>
             </Card>
