@@ -16,6 +16,7 @@ import {
 import { useTheme } from "next-themes"
 import { Bell, LogOut, Moon, Sun, User } from "lucide-react"
 import Link from "next/link"
+import { SidebarTrigger } from "./ui/sidebar"
 
 export function Header() {
   const pathname = usePathname()
@@ -50,7 +51,9 @@ export function Header() {
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
       <div className="flex flex-1 items-center justify-between">
-        <h1 className="text-xl font-semibold md:text-2xl">{getPageTitle()}</h1>
+        <h1 className="text-xl font-semibold md:text-2xl">
+          <SidebarTrigger className="ml-auto" />
+        </h1>
         <div className="flex items-center gap-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
