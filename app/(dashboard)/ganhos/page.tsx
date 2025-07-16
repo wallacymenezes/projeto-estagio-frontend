@@ -15,7 +15,7 @@ import { DataTable } from "@/components/data-table";
 import { GanhoDialog } from "@/components/ganho-dialog";
 import { formatCurrency } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react";
+import { ArrowUpDown, BanknoteIcon, Edit, ListChecksIcon, Plus, Trash } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,26 +31,23 @@ import { toast } from "@/components/ui/use-toast";
 import type { Earning } from "@/models/Earning";
 
 export default function GanhosPage() {
-  const { Earnings, deleteEarning } = useData(); // 1. Removido fetchEarnings, pois o DataContext já lida com a busca
+  const { Earnings, deleteEarning } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedGanho, setSelectedGanho] = useState<Earning | null>(null);
+  
   const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
   });
 
-  // O useEffect para buscar dados foi removido, pois o DataContext agora gerencia isso.
-
   const filteredGanhos = useMemo(() => {
     if (!Earnings) return [];
     return Earnings.filter((ganho) => {
-      // 2. CORREÇÃO: Usar 'recebimento' ou 'creationDate' como fallback no filtro
       const date = new Date(ganho.recebimento || ganho.creationDate);
-      if (!dateRange?.from || !dateRange?.to) return true; // Adicionado '?' para segurança
+      if (!dateRange?.from || !dateRange?.to) return true;
       return date >= dateRange.from && date <= dateRange.to;
     });
   }, [Earnings, dateRange]);
-
 
   const handleEdit = (ganho: Earning) => {
     setSelectedGanho(ganho);
@@ -77,24 +74,16 @@ export default function GanhosPage() {
     {
       accessorKey: "name",
       header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Nome
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Nome<ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
     },
     {
       accessorKey: "value",
       header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Valor
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Valor<ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => formatCurrency(row.getValue("value")),
@@ -102,62 +91,41 @@ export default function GanhosPage() {
     {
       accessorKey: "recebimento",
       header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Data de Recebimento
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="hidden md:flex">
+          Data de Recebimento<ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => {
         const dateValue = row.getValue("recebimento") as string;
-        if (!dateValue) return "N/A";
-        return new Date(dateValue + 'T00:00:00').toLocaleDateString("pt-BR");
+        if (!dateValue) return <span className="hidden md:inline">N/A</span>;
+        return <span className="hidden md:inline">{new Date(dateValue + 'T00:00:00').toLocaleDateString("pt-BR")}</span>;
       }
     },
     {
       accessorKey: "wage",
-      header: "Recorrente",
-      cell: ({ row }) => (row.getValue("wage") ? "Sim" : "Não"),
+      header: () => <div className="hidden sm:table-cell text-center">Recorrente</div>,
+      cell: ({ row }) => <div className="hidden sm:table-cell text-center">{row.getValue("wage") ? "Sim" : "Não"}</div>,
     },
     {
       id: "actions",
+      header: () => <div className="text-right">Ações</div>,
       cell: ({ row }) => {
         const ganho = row.original;
         return (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleEdit(ganho)}
-            >
-              <Edit className="h-4 w-4" />
-              <span className="sr-only">Editar</span>
-            </Button>
+          <div className="flex items-center justify-end">
+            <Button variant="ghost" size="icon" onClick={() => handleEdit(ganho)}><Edit className="h-4 w-4" /></Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Trash className="h-4 w-4" />
-                  <span className="sr-only">Excluir</span>
-                </Button>
+                <Button variant="ghost" size="icon"><Trash className="h-4 w-4" /></Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tem certeza que deseja excluir este ganho? Esta ação não
-                    pode ser desfeita.
-                  </AlertDialogDescription>
+                  <AlertDialogDescription>Tem certeza que deseja excluir este ganho? Esta ação não pode ser desfeita.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => handleDelete(ganho.id)}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    Excluir
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={() => handleDelete(ganho.id)} className="bg-red-600 hover:bg-red-700">Excluir</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -174,60 +142,39 @@ export default function GanhosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Ganhos</h1>
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* 3. Simplificado o DateRangePicker para passar apenas onDateChange */}
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
           <DateRangePicker onDateChange={setDateRange} />
-          <Button
-            onClick={() => {
-              setSelectedGanho(null);
-              setIsDialogOpen(true);
-            }}
-            className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
-          >
+          <Button onClick={() => { setSelectedGanho(null); setIsDialogOpen(true); }} className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600">
             <Plus className="mr-2 h-4 w-4" />
             Novo Ganho
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumo</CardTitle>
-          <CardDescription>
-            Visão geral dos seus ganhos no período selecionado
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total de Ganhos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {formatCurrency(totalGanhos)}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Quantidade de Registros
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {filteredGanhos.length}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Ganhos</CardTitle>
+            <BanknoteIcon className="h-5 w-5 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalGanhos)}</div>
+            <p className="text-xs text-muted-foreground">no período selecionado</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Quantidade de Registros</CardTitle>
+            <ListChecksIcon className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{filteredGanhos.length}</div>
+            <p className="text-xs text-muted-foreground">no período selecionado</p>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>

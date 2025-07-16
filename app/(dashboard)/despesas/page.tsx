@@ -1,4 +1,3 @@
-// wallacymenezes/projeto-estagio-frontend/projeto-estagio-frontend-d0eaefe2ab734cdf8502a055fd12d3c722944237/app/(dashboard)/despesas/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -11,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DateRangePicker } from "@/components/date-range-picker";
+import { DateRangePicker, type DateRange } from "@/components/date-range-picker";
 import { DataTable } from "@/components/data-table";
 import { DespesaDialog } from "@/components/despesa-dialog";
 import { formatCurrency } from "@/lib/utils";
@@ -31,8 +30,6 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import type { Expense, ExpenseStatus } from "@/models/Expense";
-// import { DailyExpensesChart } from "@/components/DailyExpensesChart"; // Removido
-// import { PieChart } from "@/components/charts"; // Removido
 
 export default function DespesasPage() {
   const {
@@ -40,11 +37,10 @@ export default function DespesasPage() {
     Categorys,
     Earnings,
     Investments,
-    // Não precisamos mais das funções de fetch para o carregamento inicial aqui
     deleteExpense,
   } = useData();
 
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+  const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
   });
@@ -52,26 +48,32 @@ export default function DespesasPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDespesa, setSelectedDespesa] = useState<Expense | null>(null);
 
-  const filteredExpenses = useMemo(() =>
-    Expenses.filter((despesa) => {
-      if (!despesa?.vencimento) return false;
-      const date = new Date(despesa.vencimento);
+  const filteredExpenses = useMemo(() => {
+    if (!Expenses) return [];
+    return Expenses.filter((despesa) => {
+      const date = new Date(despesa.vencimento || despesa.creationDate);
+      if (!dateRange?.from || !dateRange?.to) return true;
       return date >= dateRange.from && date <= dateRange.to;
-    }), [Expenses, dateRange]);
+    });
+  }, [Expenses, dateRange]);
 
-  const filteredEarnings = useMemo(() =>
-    Earnings.filter((earning) => {
-      if (!earning?.recebimento) return false;
-      const date = new Date(earning.recebimento);
+  const filteredEarnings = useMemo(() => {
+    if (!Earnings) return [];
+    return Earnings.filter((earning) => {
+      const date = new Date(earning.recebimento || earning.creationDate);
+      if (!dateRange?.from || !dateRange?.to) return true;
       return date >= dateRange.from && date <= dateRange.to;
-    }), [Earnings, dateRange]);
+    });
+  }, [Earnings, dateRange]);
 
-  const filteredInvestments = useMemo(() =>
-    Investments.filter((investment) => {
-      if (!investment?.creation_date) return false;
+  const filteredInvestments = useMemo(() => {
+    if (!Investments) return [];
+    return Investments.filter((investment) => {
       const date = new Date(investment.creation_date);
+      if (!dateRange?.from || !dateRange?.to) return true;
       return date >= dateRange.from && date <= dateRange.to;
-    }), [Investments, dateRange]);
+    });
+  }, [Investments, dateRange]);
 
 
   const handleEdit = (despesa: Expense) => {
@@ -98,145 +100,68 @@ export default function DespesasPage() {
   const columns: ColumnDef<Expense>[] = [
     {
       accessorKey: "name",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Nome
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: "Despesa",
     },
     {
-      id: "categoryName", // É bom ter um ID único quando se usa accessorFn
-      accessorFn: (row) => row.category?.name, // Função para acessar o nome da categoria de forma segura
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Categoria
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      id: "categoryName",
+      header: () => <div className="hidden sm:table-cell">Categoria</div>,
       cell: ({ row }) => {
-        // Acessamos o objeto category populado diretamente de row.original
         const categoryName = row.original.category?.name;
-        return categoryName || "Sem categoria";
+        return <div className="hidden sm:table-cell">{categoryName || "N/A"}</div>;
       },
     },
     {
       accessorKey: "value",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Valor
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => formatCurrency(row.getValue("value")),
+      header: () => <div className="text-right">Valor</div>,
+      cell: ({ row }) => <div className="text-right">{formatCurrency(row.getValue("value"))}</div>,
     },
     {
       accessorKey: "vencimento",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Data
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: () => <div className="hidden md:table-cell">Vencimento</div>,
       cell: ({ row }) => {
         const dateValue = row.getValue("vencimento") as string;
-        if (!dateValue) return "N/A";
-        // CORREÇÃO: Adicionar um horário neutro para evitar problemas de fuso horário
-        return new Date(dateValue + 'T00:00:00').toLocaleDateString("pt-BR");
+        if (!dateValue) return <span className="hidden md:table-cell">N/A</span>;
+        return <span className="hidden md:table-cell">{new Date(dateValue + 'T00:00:00').toLocaleDateString("pt-BR")}</span>;
       },
     },
     {
       accessorKey: "status",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Status
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: "Status",
       cell: ({ row }) => {
         const status = row.original.status as ExpenseStatus;
         let statusText = "";
         let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "outline";
-        let customStyle: React.CSSProperties = {};
-
+        
         switch (status) {
-          case "PAID":
-            statusText = "Pago";
-            badgeVariant = "secondary";
-            customStyle = { backgroundColor: 'hsl(var(--chart-2))', color: 'hsl(var(--primary-foreground))', borderColor: 'hsl(var(--chart-2))' };
-            break;
-          case "PENDING":
-            statusText = "Pendente";
-            badgeVariant = "default";
-            customStyle = { backgroundColor: 'hsl(var(--chart-4))', color: 'hsl(var(--primary-foreground))', borderColor: 'hsl(var(--chart-4))' };
-            break;
-          case "OVERDUE":
-            statusText = "Atrasada";
-            badgeVariant = "destructive";
-            break;
-          case "CANCELLED": // Novo status adicionado
-            statusText = "Cancelada";
-            badgeVariant = "outline"; // Cinza para cancelado
-            customStyle = { color: 'hsl(var(--muted-foreground))', borderColor: 'hsl(var(--muted-foreground))' };
-            break;
-          default:
-             statusText = status ? String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase() : "Desconhecido";
+          case "PAID": statusText = "Pago"; badgeVariant = "secondary"; break;
+          case "PENDING": statusText = "Pendente"; badgeVariant = "default"; break;
+          case "OVERDUE": statusText = "Atrasada"; badgeVariant = "destructive"; break;
+          case "CANCELLED": statusText = "Cancelada"; badgeVariant = "outline"; break;
+          default: statusText = "N/A";
         }
-        return <Badge variant={badgeVariant} style={badgeVariant !== 'destructive' ? customStyle : {}}>{statusText}</Badge>;
+        return <Badge variant={badgeVariant} className="text-xs">{statusText}</Badge>;
       },
     },
     {
       id: "actions",
+      header: () => <div className="text-right">Ações</div>,
       cell: ({ row }) => {
         const despesa = row.original;
         return (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleEdit(despesa)}
-            >
-              <Edit className="h-4 w-4" />
-              <span className="sr-only">Editar</span>
-            </Button>
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" size="icon" onClick={() => handleEdit(despesa)}><Edit className="h-4 w-4" /></Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Trash className="h-4 w-4" />
-                  <span className="sr-only">Excluir</span>
-                </Button>
+                <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600"><Trash className="h-4 w-4" /></Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tem certeza que deseja excluir esta despesa? Esta ação não
-                    pode ser desfeita.
-                  </AlertDialogDescription>
+                  <AlertDialogDescription>Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => handleDelete(despesa.id)}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    Excluir
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={() => handleDelete(despesa.id)} className="bg-red-600 hover:bg-red-700">Excluir</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -246,118 +171,68 @@ export default function DespesasPage() {
     },
   ];
 
-  const totalGanhosPeriodo = useMemo(() =>
-    filteredEarnings.reduce((acc, earning) => acc + earning.value, 0), [filteredEarnings]);
-
-  const totalDespesasPagasPeriodo = useMemo(() =>
-    filteredExpenses
-      .filter(expense => expense.status === "PAID")
-      .reduce((acc, expense) => acc + expense.value, 0), [filteredExpenses]);
-
-  const totalTodasDespesasPeriodo = useMemo(() =>
-    filteredExpenses.reduce((acc, expense) => acc + expense.value, 0), [filteredExpenses]);
-
-  const totalInvestidoPeriodo = useMemo(() =>
-    filteredInvestments.reduce((acc, investment) => acc + investment.value, 0), [filteredInvestments]);
-
-  const saldoEmConta = useMemo(() =>
-    totalGanhosPeriodo - totalDespesasPagasPeriodo - totalInvestidoPeriodo, [totalGanhosPeriodo, totalDespesasPagasPeriodo, totalInvestidoPeriodo]);
-
-  const saldoASobrar = useMemo(() =>
-    totalGanhosPeriodo - totalTodasDespesasPeriodo - totalInvestidoPeriodo, [totalGanhosPeriodo, totalTodasDespesasPeriodo, totalInvestidoPeriodo]);
-  function handleDateChange(range: { from?: Date; to?: Date }) {
-    if (range.from && range.to) {
-      setDateRange({ from: range.from, to: range.to });
-    }
-  }
+  const totalGanhosPeriodo = useMemo(() => filteredEarnings.reduce((acc, earning) => acc + earning.value, 0), [filteredEarnings]);
+  const totalDespesasPagasPeriodo = useMemo(() => filteredExpenses.filter(expense => expense.status === "PAID").reduce((acc, expense) => acc + expense.value, 0), [filteredExpenses]);
+  const totalTodasDespesasPeriodo = useMemo(() => filteredExpenses.reduce((acc, expense) => acc + expense.value, 0), [filteredExpenses]);
+  const totalInvestidoPeriodo = useMemo(() => filteredInvestments.reduce((acc, investment) => acc + investment.value, 0), [filteredInvestments]);
+  const saldoEmConta = useMemo(() => totalGanhosPeriodo - totalDespesasPagasPeriodo - totalInvestidoPeriodo, [totalGanhosPeriodo, totalDespesasPagasPeriodo, totalInvestidoPeriodo]);
+  const saldoASobrar = useMemo(() => totalGanhosPeriodo - totalTodasDespesasPeriodo - totalInvestidoPeriodo, [totalGanhosPeriodo, totalTodasDespesasPeriodo, totalInvestidoPeriodo]);
   
   return (
     <div className="space-y-6 min-h-full">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Despesas</h1>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <DateRangePicker onDateChange={handleDateChange} />
-          <Button
-            onClick={() => {
-              setSelectedDespesa(null);
-              setIsDialogOpen(true);
-            }}
-            className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
-          >
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+          <DateRangePicker onDateChange={setDateRange} />
+          <Button onClick={() => { setSelectedDespesa(null); setIsDialogOpen(true); }} className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600">
             <Plus className="mr-2 h-4 w-4" />
             Nova Despesa
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumo do Período</CardTitle>
-          <CardDescription>
-            Visão geral das suas finanças no período selecionado
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Total de Despesas</CardTitle>
-                <CoinsIcon className="h-5 w-5 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {formatCurrency(totalTodasDespesasPeriodo)}
-                </div>
-                 <p className="text-xs text-muted-foreground">
-                  {filteredExpenses.length} registro(s)
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Saldo em Conta</CardTitle>
-                <WalletIcon className="h-5 w-5 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${saldoEmConta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {formatCurrency(saldoEmConta)}
-                </div>
-                <p className="text-xs text-muted-foreground">Ganhos - Despesas Pagas - Investimentos</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Saldo a Sobrar</CardTitle>
-                <TrendingUpIcon className="h-5 w-5 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${saldoASobrar >=0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                  {formatCurrency(saldoASobrar)}
-                </div>
-                <p className="text-xs text-muted-foreground">Ganhos - Todas Despesas - Investimentos</p>
-              </CardContent>
-            </Card>
-             <Card>
-                <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-medium">
-                    Total de Ganhos
-                  </CardTitle>
-                   <ArrowUpIcon className="h-5 w-5 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    {formatCurrency(totalGanhosPeriodo)}
-                  </div>
-                   <p className="text-xs text-muted-foreground">
-                    {filteredEarnings.length} registro(s) no período
-                  </p>
-                </CardContent>
-              </Card>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Gráficos foram removidos */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Despesas</CardTitle>
+            <CoinsIcon className="h-5 w-5 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrency(totalTodasDespesasPeriodo)}</div>
+            <p className="text-xs text-muted-foreground">{filteredExpenses.length} registro(s) no período</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Saldo em Conta</CardTitle>
+            <WalletIcon className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${saldoEmConta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{formatCurrency(saldoEmConta)}</div>
+            <p className="text-xs text-muted-foreground">Ganhos - Despesas Pagas - Investimentos</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Saldo a Sobrar</CardTitle>
+            <TrendingUpIcon className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${saldoASobrar >=0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>{formatCurrency(saldoASobrar)}</div>
+            <p className="text-xs text-muted-foreground">Ganhos - Todas Despesas - Investimentos</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Ganhos</CardTitle>
+            <ArrowUpIcon className="h-5 w-5 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalGanhosPeriodo)}</div>
+            <p className="text-xs text-muted-foreground">{filteredEarnings.length} registro(s) no período</p>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>

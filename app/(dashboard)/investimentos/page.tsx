@@ -15,7 +15,7 @@ import { DataTable } from "@/components/data-table";
 import { InvestimentoDialog } from "@/components/investimento-dialog";
 import { formatCurrency } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react";
+import { ArrowUpDown, Edit, Plus, Trash, LineChartIcon, BanknoteIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,37 +34,29 @@ import type { Investment } from "@/models/Investment";
 const calculateNetReturn = (investment: Investment): number => {
   const { value, percentage, months, investmentType } = investment;
 
-  // 1. Calcula o rendimento bruto para o período
   const annualRate = percentage / 100;
   const grossReturn = value * (annualRate / 12) * months;
 
   let taxRate = 0;
 
-  // 2. Determina a alíquota do IR com base no tipo de investimento e prazo
+  // Usar os valores de enum corretos (maiúsculas)
   switch (investmentType) {
-    case "Tesouro Direto":
-    case "Certificado de Depósito Interbancário":
-      // Aplica a tabela regressiva (baseada em dias, aproximamos com meses)
+    case "TESOURO":
+    case "CDI":
       const days = months * 30;
-      if (days <= 180) {
-        taxRate = 0.225; // 22,5%
-      } else if (days <= 360) {
-        taxRate = 0.20; // 20%
-      } else if (days <= 720) {
-        taxRate = 0.175; // 17,5%
-      } else {
-        taxRate = 0.15; // 15%
-      }
+      if (days <= 180) taxRate = 0.225;
+      else if (days <= 360) taxRate = 0.20;
+      else if (days <= 720) taxRate = 0.175;
+      else taxRate = 0.15;
       break;
 
-    case "Ações":// Assumindo a mesma regra de ações para simplificar
-      taxRate = 0.15; // 15% sobre o lucro
+    case "ACOES":
+    case "CRYPTO":
+      taxRate = 0.15;
       break;
     
-    case "Fundo de Investimento Imobiliário":
-    case "Criptomoedas":
-    case "Poupança":
-      // Isentos para pessoa física
+    case "FIIS":
+    case "POUPANCA":
       taxRate = 0;
       break;
       
@@ -72,31 +64,23 @@ const calculateNetReturn = (investment: Investment): number => {
       taxRate = 0;
   }
 
-  // 3. Calcula o imposto e o rendimento líquido
   const taxAmount = grossReturn * taxRate;
-  const netReturn = grossReturn - taxAmount;
-
-  return netReturn;
+  return grossReturn - taxAmount;
 };
 
 
 export default function InvestimentosPage() {
-  const { Investments, Objectives, fetchInvestments, fetchObjectives, deleteInvestment } = useData();
+  const { Investments, Objectives, deleteInvestment } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedInvestment, setSelectedInvestment] =
-    useState<Investment | null>(null);
+  const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
 
   const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
   });
 
-  useEffect(() => {
-    fetchInvestments();
-    fetchObjectives();
-  }, [fetchInvestments, fetchObjectives]);
-
   const filteredInvestments = useMemo(() => {
+    if (!Investments) return [];
     return Investments.filter((investment) => {
       const date = new Date(investment.creation_date);
       if (!dateRange.from || !dateRange.to) return true;
@@ -125,95 +109,52 @@ export default function InvestimentosPage() {
     }
   };
 
+  // Definição de colunas com classes de responsividade
   const columns: ColumnDef<Investment>[] = [
     {
       accessorKey: "name",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Nome
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: "Investimento",
     },
     {
       id: 'objective',
-      header: 'Objetivo',
+      header: () => <div className="hidden sm:table-cell">Objetivo</div>,
       cell: ({ row }) => {
         const objectiveId = row.original.objectiveId;
-        if (!objectiveId) {
-          return "Nenhum";
-        }
         const objective = Objectives.find(obj => obj.id === objectiveId);
-        return objective ? objective.name : "Nenhum";
+        return <div className="hidden sm:table-cell">{objective ? objective.name : "Nenhum"}</div>;
       },
     },
     {
       accessorKey: "value",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Valor
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => formatCurrency(row.getValue("value")),
+      header: () => <div className="text-right">Valor</div>,
+      cell: ({ row }) => <div className="text-right">{formatCurrency(row.getValue("value"))}</div>,
     },
-    {
-      accessorKey: "percentage",
-      header: "Rendimento (% a.a.)",
-      cell: ({ row }) => `${row.getValue("percentage")}%`,
-    },
-    // Nova coluna para o Rendimento Líquido
     {
       id: "netReturn",
-      header: "Rendimento Líquido",
+      header: () => <div className="text-right">Rend. Líquido</div>,
       cell: ({ row }) => {
         const netReturn = calculateNetReturn(row.original);
-        return formatCurrency(netReturn);
+        return <div className="text-right font-medium text-emerald-500">{formatCurrency(netReturn)}</div>;
       }
     },
     {
       id: "actions",
+      header: () => <div className="text-right">Ações</div>,
       cell: ({ row }) => {
         const investment = row.original;
         return (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleEdit(investment)}
-            >
-              <Edit className="h-4 w-4" />
-              <span className="sr-only">Editar</span>
-            </Button>
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" size="icon" onClick={() => handleEdit(investment)}><Edit className="h-4 w-4" /></Button>
             <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Trash className="h-4 w-4" />
-                  <span className="sr-only">Excluir</span>
-                </Button>
-              </AlertDialogTrigger>
+              <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600"><Trash className="h-4 w-4" /></Button></AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tem certeza que deseja excluir este investimento? Esta ação
-                    não pode ser desfeita.
-                  </AlertDialogDescription>
+                  <AlertDialogDescription>Tem certeza que deseja excluir este investimento? Esta ação não pode ser desfeita.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => handleDelete(investment.id)}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    Excluir
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={() => handleDelete(investment.id)} className="bg-red-600 hover:bg-red-700">Excluir</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -228,57 +169,44 @@ export default function InvestimentosPage() {
     [filteredInvestments]
   );
   
-  // CORREÇÃO: O cálculo agora usa a função auxiliar
   const totalExpectedReturn = useMemo(() =>
-    filteredInvestments.reduce((acc, inv) => {
-      return acc + calculateNetReturn(inv);
-    }, 0),
+    filteredInvestments.reduce((acc, inv) => acc + calculateNetReturn(inv), 0),
     [filteredInvestments]
   );
 
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Investimentos</h1>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-          <Button
-            onClick={() => {
-              setSelectedInvestment(null);
-              setIsDialogOpen(true);
-            }}
-            className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600"
-          >
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+          <DateRangePicker onDateChange={setDateRange} />
+          <Button onClick={() => { setSelectedInvestment(null); setIsDialogOpen(true); }} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600">
             <Plus className="mr-2 h-4 w-4" />
             Novo Investimento
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Investido
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Investido</CardTitle>
+            <BanknoteIcon className="h-5 w-5 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {formatCurrency(totalInvested)}
-            </div>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(totalInvested)}</div>
+            <p className="text-xs text-muted-foreground">no período selecionado</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              Rendimento Líquido Esperado
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Rendimento Líquido Esperado</CardTitle>
+            <LineChartIcon className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {formatCurrency(totalExpectedReturn)}
-            </div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalExpectedReturn)}</div>
+            <p className="text-xs text-muted-foreground">considerando o prazo total</p>
           </CardContent>
         </Card>
       </div>
@@ -286,9 +214,7 @@ export default function InvestimentosPage() {
       <Card>
         <CardHeader>
           <CardTitle>Todos os Investimentos</CardTitle>
-          <CardDescription>
-            Gerencie todos os seus investimentos
-          </CardDescription>
+          <CardDescription>Gerencie todos os seus investimentos</CardDescription>
         </CardHeader>
         <CardContent>
           <DataTable
