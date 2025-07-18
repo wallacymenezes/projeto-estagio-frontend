@@ -97,7 +97,7 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
         category: category,
         status,
         // CORREÇÃO: Formatar a data para YYYY-MM-DD
-        vencimento: vencimento ? format(vencimento, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+        vencimento: vencimento ? format(vencimento, "yyyy-MM-dd") : undefined
       };
 
       if (despesa) {

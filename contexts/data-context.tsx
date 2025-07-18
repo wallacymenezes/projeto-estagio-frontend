@@ -19,6 +19,7 @@ import { atualizar, buscar, register, deletar } from "@/Service/Service";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "./auth-context";
 import type { DateRange } from "react-day-picker";
+import { format } from "date-fns";
 
 interface BackendExpenseData {
   id: number;
@@ -185,14 +186,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return undefined;
     }
     try {
-      const payload = {
-        name: expenseData.name,
-        description: expenseData.description,
-        value: expenseData.value,
-        categoryId: expenseData.category.id,
-        status: expenseData.status,
-        userId,
-      };
+      const payload: any = { ...expenseData, userId };
       const newExpenseFromApi: BackendExpenseData = await register("/expenses", payload, token);
       const categoryDetail = Categorys.find(cat => cat.id === newExpenseFromApi.categoryId);
       const newPopulatedExpense: Expense = {
