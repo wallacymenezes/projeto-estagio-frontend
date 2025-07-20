@@ -16,7 +16,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { CalendarIcon, Loader2 } from "lucide-react"
+import { AlertCircle as AlertCircleIcon, CalendarIcon, Loader2 } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import type { Expense, ExpenseStatus } from "@/models/Expense"
 import type { Category } from "@/models/Category"
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
@@ -25,13 +26,18 @@ import { ptBR } from "date-fns/locale"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
-
 interface DespesaDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   despesa: Expense | null
   categorias: Category[]
 }
+
+type FormErrors = {
+  name?: string;
+  value?: string;
+  category?: string;
+};
 
 export function DespesaDialog({ open, onOpenChange, despesa, categorias }: DespesaDialogProps) {
   const { addExpense, updateExpense } = useData()
@@ -43,9 +49,16 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
   const [value, setValue] = useState("")
   const [category, setCategory] = useState<Category | null>(null)
   const [status, setStatus] = useState<ExpenseStatus>("PENDING")
-  // 1. Alterado o tipo para permitir null e garantir que sempre tenhamos um valor
   const [vencimento, setVencimento] = useState<Date | undefined | null>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  const handleOpenChange = (isOpen: boolean) => {
+    onOpenChange(isOpen);
+    if (!isOpen) {
+      setErrors({}); // Limpa todos os erros ao fechar
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -55,38 +68,44 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
         setValue(despesa.value.toString())
         setCategory(despesa.category)
         setStatus(despesa.status || "PENDING")
-        // Garante que a data seja um objeto Date válido ou null
-        setVencimento(despesa.vencimento ? new Date(despesa.vencimento) : null);
+        setVencimento(despesa.vencimento ? new Date(despesa.vencimento + 'T00:00:00') : null);
       } else {
         setName("")
         setDescription("")
         setValue("")
         setCategory(null)
         setStatus("PENDING")
-        // Define a data de hoje como padrão para novos gastos
         setVencimento(new Date());
       }
+      setErrors({});
     }
   }, [open, despesa])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    setErrors({}); // Limpa erros antigos
+    const newErrors: FormErrors = {};
 
-    if (!name || !value || isNaN(Number(value)) || Number(value) <= 0 || !category) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Preencha nome, valor e categoria com dados válidos.",
-        variant: "destructive",
-      })
-      return
+    if (!name.trim() || name.trim().length < 3) {
+      newErrors.name = "O nome é obrigatório e deve ter pelo menos 3 caracteres.";
+    }
+    if (!value || isNaN(Number(value)) || Number(value) <= 0) {
+      newErrors.value = "Insira um valor válido.";
+    }
+    if (!category) {
+      newErrors.category = "Selecione uma categoria.";
+    }
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
     }
 
     setLoading(true)
-
+    
     try {
-      // 2. Garantir que o 'vencimento' sempre tenha um valor válido para formatação
       const dataParaEnvio = vencimento || new Date();
-
       const despesaDataPayload = {
         name,
         description,
@@ -98,16 +117,10 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
 
       if (despesa) {
         await updateExpense(despesa.id, despesaDataPayload as Partial<Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">>);
-        toast({
-          title: "Despesa atualizada",
-          description: "A despesa foi atualizada com sucesso.",
-        })
+        toast({ title: "Despesa atualizada", description: "A despesa foi atualizada com sucesso." })
       } else {
         await addExpense(despesaDataPayload as Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">);
-        toast({
-          title: "Despesa adicionada",
-          description: "A despesa foi adicionada com sucesso.",
-        })
+        toast({ title: "Despesa adicionada", description: "A despesa foi adicionada com sucesso." })
       }
 
       onOpenChange(false)
@@ -124,21 +137,39 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    // Usa a nova função handleOpenChange para controlar o diálogo
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{despesa ? "Editar Despesa" : "Nova Despesa"}</DialogTitle>
           <DialogDescription>
-            {despesa
-              ? "Edite as informações da despesa selecionada."
-              : "Preencha as informações para adicionar uma nova despesa."}
+            {despesa ? "Edite as informações da despesa selecionada." : "Preencha as informações para adicionar uma nova despesa."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
+            {Object.values(errors).find(error => error) && (
+              <Alert variant="destructive" className="bg-red-500/10 border-red-500/50 text-red-500 dark:text-red-400 [&>svg]:text-red-500 dark:[&>svg]:text-red-400">
+                <AlertCircleIcon className="h-4 w-4" />
+                <AlertTitle>Erro de Validação</AlertTitle>
+                <AlertDescription>
+                  <p>{Object.values(errors).find(error => error)}</p>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="grid gap-2">
-              <Label htmlFor="name">Nome</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Aluguel, Mercado, etc." required />
+              <Label htmlFor="name">Nome (*)</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (errors.name) setErrors(prev => ({ ...prev, name: undefined }));
+                }}
+                placeholder="Ex: Aluguel, Mercado, etc."
+                className={cn(errors.name && "border-red-500 focus-visible:ring-red-500")}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="description">Descrição</Label>
@@ -158,28 +189,21 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={vencimento ?? undefined}
-                    onSelect={(date) => {
-                      setVencimento(date)
-                      setIsCalendarOpen(false)
-                    }}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={vencimento ?? undefined} onSelect={(date) => { setVencimento(date); setIsCalendarOpen(false); }} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="category">Categoria</Label>
+              <Label htmlFor="category">Categoria (*)</Label>
               <Select
                 value={category?.id?.toString() ?? ""}
                 onValueChange={(val) => {
                   const selectedCat = categorias.find(c => c.id.toString() === val);
                   setCategory(selectedCat ?? null);
+                  if (selectedCat && errors.category) setErrors(prev => ({ ...prev, category: undefined }));
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className={cn(errors.category && "border-red-500 focus-visible:ring-red-500")}>
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
