@@ -82,7 +82,7 @@ export function GanhoDialog({ open, onOpenChange, ganho }: GanhoDialogProps) {
         description,
         value: Number.parseFloat(value),
         wage,
-        recebimento: recebimento ? format(recebimento, "yyyy-MM-dd'T'HH:mm:ss") : new Date().toISOString(),
+        recebimento: recebimento ? format(recebimento, "yyyy-MM-dd") : undefined,
       }
 
       if (ganho) {

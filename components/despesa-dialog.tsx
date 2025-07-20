@@ -43,7 +43,8 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
   const [value, setValue] = useState("")
   const [category, setCategory] = useState<Category | null>(null)
   const [status, setStatus] = useState<ExpenseStatus>("PENDING")
-  const [vencimento, setVencimento] = useState<Date | undefined>(new Date());
+  // 1. Alterado o tipo para permitir null e garantir que sempre tenhamos um valor
+  const [vencimento, setVencimento] = useState<Date | undefined | null>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   useEffect(() => {
@@ -54,13 +55,15 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
         setValue(despesa.value.toString())
         setCategory(despesa.category)
         setStatus(despesa.status || "PENDING")
-        setVencimento(despesa.vencimento ? new Date(despesa.vencimento) : new Date());
+        // Garante que a data seja um objeto Date válido ou null
+        setVencimento(despesa.vencimento ? new Date(despesa.vencimento) : null);
       } else {
         setName("")
         setDescription("")
         setValue("")
         setCategory(null)
         setStatus("PENDING")
+        // Define a data de hoje como padrão para novos gastos
         setVencimento(new Date());
       }
     }
@@ -69,19 +72,10 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!name || !value || isNaN(Number(value)) || Number(value) <= 0) {
+    if (!name || !value || isNaN(Number(value)) || Number(value) <= 0 || !category) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha nome e valor com dados válidos.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!category) {
-      toast({
-        title: "Categoria obrigatória",
-        description: "Por favor, selecione uma categoria.",
+        description: "Preencha nome, valor e categoria com dados válidos.",
         variant: "destructive",
       })
       return
@@ -90,14 +84,16 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
     setLoading(true)
 
     try {
+      // 2. Garantir que o 'vencimento' sempre tenha um valor válido para formatação
+      const dataParaEnvio = vencimento || new Date();
+
       const despesaDataPayload = {
         name,
         description,
         value: Number.parseFloat(value),
         category: category,
         status,
-        // CORREÇÃO: Formatar a data para YYYY-MM-DD
-        vencimento: vencimento ? format(vencimento, "yyyy-MM-dd") : undefined
+        vencimento: format(dataParaEnvio, "yyyy-MM-dd"),
       };
 
       if (despesa) {
@@ -119,9 +115,7 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
       console.error("Erro ao salvar despesa:", error);
       toast({
         title: "Erro",
-        description: despesa
-          ? "Não foi possível atualizar a despesa."
-          : "Não foi possível adicionar a despesa.",
+        description: despesa ? "Não foi possível atualizar a despesa." : "Não foi possível adicionar a despesa.",
         variant: "destructive",
       })
     } finally {
@@ -144,37 +138,15 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Nome</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Aluguel, Mercado, etc."
-                required
-              />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Aluguel, Mercado, etc." required />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="description">Descrição</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descrição da despesa"
-                className="resize-none"
-                rows={3}
-              />
+              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição da despesa" className="resize-none" rows={3} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="value">Valor (R$)</Label>
-              <Input
-                id="value"
-                type="number"
-                step="0.01"
-                min="0"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder="0,00"
-                required
-              />
+              <Input id="value" type="number" step="0.01" min="0" value={value} onChange={(e) => setValue(e.target.value)} placeholder="0,00" required />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="vencimento">Data de Vencimento</Label>
@@ -188,7 +160,7 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
-                    selected={vencimento}
+                    selected={vencimento ?? undefined}
                     onSelect={(date) => {
                       setVencimento(date)
                       setIsCalendarOpen(false)
@@ -212,20 +184,14 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
                 </SelectTrigger>
                 <SelectContent>
                   {categorias.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id.toString()}>
-                      {cat.name}
-                    </SelectItem>
+                    <SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="status">Status</Label>
-              <Select
-                value={status}
-                onValueChange={(val: string) => setStatus(val as ExpenseStatus)}
-                required
-              >
+              <Select value={status} onValueChange={(val: string) => setStatus(val as ExpenseStatus)} required>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
@@ -239,24 +205,9 @@ export function DespesaDialog({ open, onOpenChange, despesa, categorias }: Despe
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {despesa ? "Atualizando..." : "Adicionando..."}
-                </>
-              ) : despesa ? (
-                "Atualizar"
-              ) : (
-                "Adicionar"
-              )}
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
+            <Button type="submit" disabled={loading} className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600">
+              {loading ? ( <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {despesa ? "Atualizando..." : "Adicionando..."}</> ) : ( despesa ? "Atualizar" : "Adicionar" )}
             </Button>
           </DialogFooter>
         </form>

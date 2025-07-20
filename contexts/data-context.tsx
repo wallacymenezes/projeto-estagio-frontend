@@ -180,23 +180,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [token, userId, authLoading]);
 
 
-  const addExpense = async (expenseData: Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">): Promise<Expense | undefined> => {
+  const addExpense = async (expenseData: Omit<Expense, "id" | "creationDate" | "userId" | "categoryId">) => {
     if (!expenseData.category) {
       toast({ title: "Erro", description: "Categoria não fornecida.", variant: "destructive" });
       return undefined;
     }
     try {
-      const payload: any = { ...expenseData, userId };
+      // CORREÇÃO: Montar o payload manualmente com os campos corretos
+      const payload = {
+        name: expenseData.name,
+        description: expenseData.description,
+        value: expenseData.value,
+        vencimento: expenseData.vencimento,
+        status: expenseData.status,
+        categoryId: expenseData.category.id, // Envia apenas o ID da categoria
+        userId,
+      };
       const newExpenseFromApi: BackendExpenseData = await register("/expenses", payload, token);
       const categoryDetail = Categorys.find(cat => cat.id === newExpenseFromApi.categoryId);
-      const newPopulatedExpense: Expense = {
+      const newExpense: Expense = {
         ...newExpenseFromApi,
-        category: categoryDetail || null, // CORREÇÃO: Garante que seja Category | null
+        category: categoryDetail || null,
       };
-      setExpenses((prev) => [...prev, newPopulatedExpense]);
-      return newPopulatedExpense;
-    } catch (error: any) {
-      toast({ title: "Erro ao adicionar Despesa", description: error.message || "Erro.", variant: "destructive" });
+      setExpenses((prev) => [...prev, newExpense]);
+      return newExpense;
+    } catch (error: any) { 
+      toast({ title: "Erro ao adicionar Despesa", description: error.message || "Ocorreu um erro.", variant: "destructive" });
       throw error;
     }
   };
