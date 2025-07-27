@@ -15,7 +15,7 @@ import { DataTable } from "@/components/data-table";
 import { GanhoDialog } from "@/components/ganho-dialog";
 import { formatCurrency } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, BanknoteIcon, Edit, ListChecksIcon, Plus, Trash } from "lucide-react";
+import { ArrowUpDown, Edit, Plus, Trash, ListChecksIcon, BanknoteIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,23 +31,18 @@ import { toast } from "@/components/ui/use-toast";
 import type { Earning } from "@/models/Earning";
 
 export default function GanhosPage() {
-  const { Earnings, deleteEarning } = useData();
+  const { Earnings, deleteEarning, dateRange, setDateRange } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedGanho, setSelectedGanho] = useState<Earning | null>(null);
-  
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
-  });
 
   const filteredGanhos = useMemo(() => {
-    if (!Earnings) return [];
+    if (!Earnings || !dateRange?.from || !dateRange?.to) return [];
     return Earnings.filter((ganho) => {
       const date = new Date(ganho.recebimento || ganho.creationDate);
-      if (!dateRange?.from || !dateRange?.to) return true;
-      return date >= dateRange.from && date <= dateRange.to;
+      return date >= dateRange.from! && date <= dateRange.to!;
     });
   }, [Earnings, dateRange]);
+
 
   const handleEdit = (ganho: Earning) => {
     setSelectedGanho(ganho);
@@ -73,32 +68,20 @@ export default function GanhosPage() {
   const columns: ColumnDef<Earning>[] = [
     {
       accessorKey: "name",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Nome<ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: "Ganho",
     },
     {
       accessorKey: "value",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Valor<ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => formatCurrency(row.getValue("value")),
+      header: () => <div className="text-right">Valor</div>,
+      cell: ({ row }) => <div className="text-right">{formatCurrency(row.getValue("value"))}</div>,
     },
     {
       accessorKey: "recebimento",
-      header: ({ column }) => (
-        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="hidden md:flex">
-          Data de Recebimento<ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: () => <div className="hidden md:table-cell">Data</div>,
       cell: ({ row }) => {
         const dateValue = row.getValue("recebimento") as string;
-        if (!dateValue) return <span className="hidden md:inline">N/A</span>;
-        return <span className="hidden md:inline">{new Date(dateValue + 'T00:00:00').toLocaleDateString("pt-BR")}</span>;
+        if (!dateValue) return <span className="hidden md:table-cell">N/A</span>;
+        return <span className="hidden md:table-cell">{new Date(dateValue).toLocaleDateString("pt-BR")}</span>;
       }
     },
     {
@@ -112,11 +95,11 @@ export default function GanhosPage() {
       cell: ({ row }) => {
         const ganho = row.original;
         return (
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" size="icon" onClick={() => handleEdit(ganho)}><Edit className="h-4 w-4" /></Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon"><Trash className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600"><Trash className="h-4 w-4" /></Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>

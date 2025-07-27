@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,7 @@ import { DataTable } from "@/components/data-table";
 import { DespesaDialog } from "@/components/despesa-dialog";
 import { formatCurrency } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Edit, Plus, Trash, WalletIcon, TrendingUpIcon, CoinsIcon, ArrowUpIcon } from "lucide-react";
+import { Edit, Plus, Trash, WalletIcon, TrendingUpIcon, CoinsIcon, ArrowUpIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,40 +38,34 @@ export default function DespesasPage() {
     Earnings,
     Investments,
     deleteExpense,
+    dateRange,
+    setDateRange,
   } = useData();
-
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
-  });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDespesa, setSelectedDespesa] = useState<Expense | null>(null);
 
   const filteredExpenses = useMemo(() => {
-    if (!Expenses) return [];
+    if (!Expenses || !dateRange?.from || !dateRange?.to) return [];
     return Expenses.filter((despesa) => {
       const date = new Date(despesa.vencimento || despesa.creationDate);
-      if (!dateRange?.from || !dateRange?.to) return true;
-      return date >= dateRange.from && date <= dateRange.to;
+      return date >= dateRange.from! && date <= dateRange.to!;
     });
   }, [Expenses, dateRange]);
 
   const filteredEarnings = useMemo(() => {
-    if (!Earnings) return [];
+    if (!Earnings || !dateRange?.from || !dateRange?.to) return [];
     return Earnings.filter((earning) => {
       const date = new Date(earning.recebimento || earning.creationDate);
-      if (!dateRange?.from || !dateRange?.to) return true;
-      return date >= dateRange.from && date <= dateRange.to;
+      return date >= dateRange.from! && date <= dateRange.to!;
     });
   }, [Earnings, dateRange]);
 
   const filteredInvestments = useMemo(() => {
-    if (!Investments) return [];
+    if (!Investments || !dateRange?.from || !dateRange?.to) return [];
     return Investments.filter((investment) => {
       const date = new Date(investment.creation_date);
-      if (!dateRange?.from || !dateRange?.to) return true;
-      return date >= dateRange.from && date <= dateRange.to;
+      return date >= dateRange.from! && date <= dateRange.to!;
     });
   }, [Investments, dateRange]);
 
@@ -97,6 +91,7 @@ export default function DespesasPage() {
     }
   };
 
+  // Definição de colunas com classes de responsividade
   const columns: ColumnDef<Expense>[] = [
     {
       accessorKey: "name",
@@ -148,7 +143,7 @@ export default function DespesasPage() {
       cell: ({ row }) => {
         const despesa = row.original;
         return (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end">
             <Button variant="ghost" size="icon" onClick={() => handleEdit(despesa)}><Edit className="h-4 w-4" /></Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -209,7 +204,7 @@ export default function DespesasPage() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${saldoEmConta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{formatCurrency(saldoEmConta)}</div>
-            <p className="text-xs text-muted-foreground">Ganhos - Despesas Pagas - Investimentos</p>
+            <p className="text-xs text-muted-foreground">Ganhos - Despesas Pagas - Invest.</p>
           </CardContent>
         </Card>
         <Card>
@@ -219,7 +214,7 @@ export default function DespesasPage() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${saldoASobrar >=0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>{formatCurrency(saldoASobrar)}</div>
-            <p className="text-xs text-muted-foreground">Ganhos - Todas Despesas - Investimentos</p>
+            <p className="text-xs text-muted-foreground">Ganhos - Todas Despesas - Invest.</p>
           </CardContent>
         </Card>
         <Card>
