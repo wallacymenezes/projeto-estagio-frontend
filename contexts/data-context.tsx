@@ -440,7 +440,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
        // O payload enviado já terá 'target' se ele estiver sendo atualizado
       const updated: Objective = await atualizar(
-        `/objectives/`,
+        `/objectives`,
         { ...objective, id, userId },
         token
       );
